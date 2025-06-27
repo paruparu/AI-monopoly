@@ -100,6 +100,15 @@
                         <button id="manage-assets-btn" class="bg-purple-500 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg shadow-xl w-full">資産管理</button>
                     </div>
                 </div>
+                <!-- Jail Action Panel -->
+                <div id="jail-action-panel" class="text-center hidden">
+                    <p class="mb-2 text-lg font-bold">刑務所から出る方法を選択してください:</p>
+                    <div class="flex flex-col gap-2">
+                        <button id="jail-roll-dice-btn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-xl w-full">サイコロを振る (ゾロ目が出たら無料)</button>
+                        <button id="jail-pay-fine-btn" class="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-3 px-6 rounded-lg shadow-xl w-full">¥5,000 払って出る</button>
+                        <button id="jail-use-card-btn" class="bg-green-500 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-xl w-full">「刑務所から釈放」カードを使う</button>
+                    </div>
+                </div>
             </div>
             <div id="log-area" class="w-full mt-4">
                 <h3 class="font-bold text-center">ゲームログ</h3>
@@ -243,14 +252,67 @@
         let players = [];
         let currentPlayerIndex = 0;
         let isGameOver = false;
+        let tradePartnerId = null;
+        let activeCpuOffer = null;
+        let isCounteringCpuOffer = false;
         const DOM = {};
 
         function cacheDomElements() {
+            // Cache all DOM elements with IDs
             const elements = document.querySelectorAll('[id]');
             elements.forEach(el => {
+                // Convert kebab-case to camelCase for easier access
                 const key = el.id.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
                 DOM[key] = el;
             });
+
+            // Explicitly cache critical elements for robustness
+            DOM.rollDiceBtn = document.getElementById('roll-dice-btn');
+            DOM.manageAssetsBtn = document.getElementById('manage-assets-btn');
+            DOM.actionBuyBtn = document.getElementById('action-buy-btn');
+            DOM.actionPassBtn = document.getElementById('action-pass-btn');
+            DOM.actionPanel = document.getElementById('action-panel');
+            DOM.turnIndicator = document.getElementById('turn-indicator');
+            DOM.diceArea = document.getElementById('dice-area');
+            DOM.jailActionPanel = document.getElementById('jail-action-panel');
+            DOM.jailRollDiceBtn = document.getElementById('jail-roll-dice-btn');
+            DOM.jailPayFineBtn = document.getElementById('jail-pay-fine-btn');
+            DOM.jailUseCardBtn = document.getElementById('jail-use-card-btn');
+            DOM.modalCloseBtn = document.getElementById('modal-close-btn');
+            DOM.manageAssetsCloseBtn = document.getElementById('manage-assets-close-btn');
+            DOM.tradeCancelBtn = document.getElementById('trade-cancel-btn');
+            DOM.tradeProposeBtn = document.getElementById('trade-propose-btn');
+            DOM.cpuOfferRejectBtn = document.getElementById('cpu-offer-reject-btn');
+            DOM.cpuOfferCounterBtn = document.getElementById('cpu-offer-counter-btn');
+            DOM.cpuOfferAcceptBtn = document.getElementById('cpu-offer-accept-btn');
+            DOM.cpuTradeLogCloseBtn = document.getElementById('cpu-trade-log-close-btn');
+            DOM.propertyModal = document.getElementById('property-modal');
+            DOM.manageAssetsModal = document.getElementById('manage-assets-modal');
+            DOM.tradeModal = document.getElementById('trade-modal');
+            DOM.cpuOfferModal = document.getElementById('cpu-offer-modal');
+            DOM.cpuTradeLogModal = document.getElementById('cpu-trade-log-modal');
+            DOM.modalPropertyName = document.getElementById('modal-property-name');
+            DOM.modalColorBar = document.getElementById('modal-color-bar');
+            DOM.modalPropertyInfo = document.getElementById('modal-property-info');
+            DOM.assetGroupsContainer = document.getElementById('asset-groups-container');
+            DOM.tradeModalTitle = document.getElementById('trade-modal-title');
+            DOM.tradeYourOfferTitle = document.getElementById('trade-your-offer-title');
+            DOM.tradeTheirOfferTitle = document.getElementById('trade-their-offer-title');
+            DOM.tradeYourProperties = document.getElementById('trade-your-properties');
+            DOM.tradeTheirProperties = document.getElementById('trade-their-properties');
+            DOM.tradeYourMoney = document.getElementById('trade-your-money');
+            DOM.tradeTheirMoney = document.getElementById('trade-their-money');
+            DOM.tradeMessage = document.getElementById('trade-message');
+            DOM.tradeCpuResponse = document.getElementById('trade-cpu-response');
+            DOM.cpuOfferTitle = document.getElementById('cpu-offer-title');
+            DOM.cpuOfferText = document.getElementById('cpu-offer-text');
+            DOM.cpuOfferRequest = document.getElementById('cpu-offer-request');
+            DOM.cpuOfferProposal = document.getElementById('cpu-offer-proposal');
+            DOM.playersInfoContainer = document.getElementById('players-info-container');
+            DOM.logMessages = document.getElementById('log-messages');
+            DOM.board = document.getElementById('board');
+            DOM.dice1 = document.getElementById('dice1');
+            DOM.dice2 = document.getElementById('dice2');
         }
 
         function initGame() {
@@ -264,9 +326,9 @@
             });
             drawBoard();
             players = [
-                { id: 0, name: 'あなた', type: 'human', money: 150000, position: 0, properties: [], inJail: false, jailTurns: 0, getOutOfJailFree: false, tokenElement: null, color: '#ef4444' },
-                { id: 1, name: 'CPU 1', type: 'cpu', money: 150000, position: 0, properties: [], inJail: false, jailTurns: 0, getOutOfJailFree: false, tokenElement: null, color: '#3b82f6' },
-                { id: 2, name: 'CPU 2', type: 'cpu', money: 150000, position: 0, properties: [], inJail: false, jailTurns: 0, getOutOfJailFree: false, tokenElement: null, color: '#22c55e' }
+                { id: 0, name: 'あなた', type: 'human', money: 150000, position: 0, properties: [], inJail: false, jailTurns: 0, getOutOfJailFree: false, tokenElement: null, color: '#ef4444', tradeCooldownTurns: 0, necessityPercentage: 0 },
+                { id: 1, name: 'CPU 1', type: 'cpu', money: 150000, position: 0, properties: [], inJail: false, jailTurns: 0, getOutOfJailFree: false, tokenElement: null, color: '#3b82f6', tradeCooldownTurns: 0, necessityPercentage: 0 },
+                { id: 2, name: 'CPU 2', type: 'cpu', money: 150000, position: 0, properties: [], inJail: false, jailTurns: 0, getOutOfJailFree: false, tokenElement: null, color: '#22c55e', tradeCooldownTurns: 0, necessityPercentage: 0 }
             ];
             players.forEach(p => {
                 createPlayerToken(p);
@@ -287,6 +349,89 @@
             DOM.manageAssetsBtn.addEventListener('click', openManageAssetsModal);
             DOM.modalCloseBtn.addEventListener('click', () => DOM.propertyModal.classList.add('hidden'));
             DOM.manageAssetsCloseBtn.addEventListener('click', () => DOM.manageAssetsModal.classList.add('hidden'));
+            DOM.tradeCancelBtn.addEventListener('click', () => DOM.tradeModal.classList.add('hidden'));
+            DOM.tradeProposeBtn.addEventListener('click', handleTradeProposal);
+            DOM.cpuOfferRejectBtn.addEventListener('click', handleCpuOfferReject);
+            DOM.cpuOfferCounterBtn.addEventListener('click', handleCpuOfferCounter);
+            DOM.cpuOfferAcceptBtn.addEventListener('click', handleCpuOfferAccept);
+            DOM.cpuTradeLogCloseBtn.addEventListener('click', () => DOM.cpuTradeLogModal.classList.add('hidden'));
+
+            // Jail action buttons
+            DOM.jailRollDiceBtn.addEventListener('click', handleJailRollDice);
+            DOM.jailPayFineBtn.addEventListener('click', handleJailPayFine);
+            DOM.jailUseCardBtn.addEventListener('click', handleJailUseCard);
+        }
+
+        function updateJailActionButtons(player) {
+            DOM.jailPayFineBtn.disabled = player.money < 5000;
+            DOM.jailUseCardBtn.disabled = !player.getOutOfJailFree;
+        }
+
+        async function handleJailRollDice() {
+            const player = players[currentPlayerIndex];
+            DOM.jailActionPanel.classList.add('hidden');
+            DOM.diceArea.classList.remove('hidden');
+            DOM.rollDiceBtn.disabled = true; // Prevent rolling main dice
+
+            const dice1 = Math.floor(Math.random() * 6) + 1;
+            const dice2 = Math.floor(Math.random() * 6) + 1;
+            DOM.dice1.textContent = dice1;
+            DOM.dice2.textContent = dice2;
+            addLog(`${player.name} は刑務所でサイコロを振って ${dice1}と${dice2}、計${dice1 + dice2}が出た。`);
+
+            if (dice1 === dice2) {
+                addLog(`ゾロ目が出たので釈放！`);
+                player.inJail = false;
+                player.jailTurns = 0;
+                movePlayerBy(player, dice1 + dice2); // Move player after getting out
+            } else {
+                player.jailTurns++;
+                addLog(`今回は出られなかった... (${player.jailTurns}ターン目)`);
+                if (player.jailTurns >= 3) {
+                    addLog(`3ターン経過したので、¥5,000 を支払い釈放。`);
+                    player.money -= 5000;
+                    player.inJail = false;
+                    player.jailTurns = 0;
+                    updatePlayerInfo(player);
+                    endTurn();
+                } else {
+                    endTurn();
+                }
+            }
+        }
+
+        function handleJailPayFine() {
+            const player = players[currentPlayerIndex];
+            if (player.money >= 5000) {
+                player.money -= 5000;
+                player.inJail = false;
+                player.jailTurns = 0;
+                addLog(`${player.name} は ¥5,000 を支払い刑務所から釈放された。`);
+                updatePlayerInfo(player);
+                DOM.jailActionPanel.classList.add('hidden');
+                DOM.diceArea.classList.remove('hidden');
+                DOM.rollDiceBtn.disabled = false;
+                endTurn();
+            } else {
+                alert('所持金が足りません。');
+            }
+        }
+
+        function handleJailUseCard() {
+            const player = players[currentPlayerIndex];
+            if (player.getOutOfJailFree) {
+                player.getOutOfJailFree = false;
+                player.inJail = false;
+                player.jailTurns = 0;
+                addLog(`${player.name} は「刑務所から釈放」カードを使い刑務所から釈放された。`);
+                updatePlayerInfo(player);
+                DOM.jailActionPanel.classList.add('hidden');
+                DOM.diceArea.classList.remove('hidden');
+                DOM.rollDiceBtn.disabled = false;
+                endTurn();
+            } else {
+                alert('「刑務所から釈放」カードを持っていません。');
+            }
         }
 
         function drawBoard() {
@@ -326,7 +471,11 @@
                 DOM.playersInfoContainer.appendChild(container);
             }
 
-            // Group owned properties by color/type
+            let tradeButtonHtml = '';
+            if (player.type === 'cpu') {
+                tradeButtonHtml = `<button class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-1 rounded-full" onclick="openTradeModal(${player.id})">交渉</button>`;
+            }
+
             const ownedPropertiesGrouped = {};
             player.properties.forEach(pIdx => {
                 const prop = boardData[pIdx];
@@ -352,16 +501,26 @@
                     const bgColor = isColorGroup ? groupKey : '#6b7280'; // gray for railroad/utility
                     
                     props.forEach(prop => {
-                        propertiesHtml += `<div class="text-xs text-white px-1.5 py-0.5 rounded" style="background-color: ${bgColor}; text-shadow: 0 0 3px #000;">${prop.name}</div>`;
+                        propertiesHtml += `<div class="text-xs text-white px-1.5 py-0.5 rounded" style="background-color: ${bgColor}; text-shadow: 0 0 3px #000;">${prop?.name || '不明な物件'}</div>`;
                     });
                 }
             }
             propertiesHtml += '</div>';
 
+            let jailCardHtml = '';
+            if (player.getOutOfJailFree) {
+                jailCardHtml = '<div class="text-xs text-green-600 font-bold mt-1">刑務所から釈放カードあり</div>';
+            }
+
             container.style.border = `2px solid ${player.color}`;
             container.innerHTML = `
-                <div class="font-bold" style="color: ${player.color}">${player.name} ${player.inJail ? '(刑務所)' : ''}</div>
+                <div class="flex justify-between items-center">
+                    <div class="font-bold" style="color: ${player.color}">${player.name} ${player.inJail ? '(刑務所)' : ''}</div>
+                    ${player.type === 'cpu' ? `<span id="cpu-necessity-display-${player.id}" class="text-xs text-blue-700 ml-2">交渉必要度: ${player.necessityPercentage.toFixed(1)}%</span>` : ''}
+                </div>
                 <div>所持金: ¥${player.money.toLocaleString()}</div>
+                ${jailCardHtml}
+                ${player.type === 'cpu' ? `<div class="mt-2">${tradeButtonHtml}</div>` : ''} <!-- Move trade button here -->
                 <div class="font-bold mt-2 text-sm border-b">所有物件</div>
                 ${propertiesHtml}
             `;
@@ -383,7 +542,7 @@
             DOM.logMessages.prepend(logEl);
         }
 
-        function startTurn() {
+        async function startTurn() {
             if (isGameOver) return;
 
             // Highlight current player
@@ -396,21 +555,79 @@
 
             const currentPlayer = players[currentPlayerIndex];
             DOM.turnIndicator.textContent = `${currentPlayer.name} の番です`;
-            players.forEach(p => updatePlayerInfo(p)); // Update all infos for freshness
+
+            // Update necessity percentage for all CPUs at the start of each turn
+            players.filter(p => p.type === 'cpu').forEach(cpu => {
+                cpu.necessityPercentage = calculateTradeNecessity(cpu);
+                updatePlayerInfo(cpu); // Update UI for all CPUs
+            });
+            updatePlayerInfo(players[0]); // Also update human player info to ensure consistency
 
             if (currentPlayer.type === 'human') {
-                DOM.rollDiceBtn.disabled = currentPlayer.inJail;
-                DOM.manageAssetsBtn.disabled = false;
-            } else {
+                // 人間プレイヤーが刑務所にいる場合の処理
+                if (currentPlayer.inJail) {
+                    DOM.rollDiceBtn.disabled = true;
+                    DOM.manageAssetsBtn.disabled = true;
+                    DOM.diceArea.classList.add('hidden');
+                    DOM.jailActionPanel.classList.remove('hidden');
+                    updateJailActionButtons(currentPlayer);
+                } else {
+                    DOM.rollDiceBtn.disabled = false;
+                    DOM.manageAssetsBtn.disabled = false;
+                    DOM.diceArea.classList.remove('hidden');
+                    DOM.jailActionPanel.classList.add('hidden');
+                    // 通常のサイコロを振るボタンを有効化
+                    DOM.rollDiceBtn.disabled = false;
+                }
+            } else { // CPU turn
                 DOM.rollDiceBtn.disabled = true;
                 DOM.manageAssetsBtn.disabled = true;
-                setTimeout(() => {
-                    if (currentPlayer.inJail) {
-                        handleJailTurn(currentPlayer, false); // CPU doesn't try to roll for doubles for now
-                    } else {
-                        rollDiceAndMove(currentPlayer);
+                DOM.diceArea.classList.remove('hidden'); // Ensure dice area is visible for CPU
+                DOM.jailActionPanel.classList.add('hidden'); // Hide jail panel for CPU
+
+                if (currentPlayer.tradeCooldownTurns > 0) {
+                    currentPlayer.tradeCooldownTurns--;
+                    addLog(`${currentPlayer.name} は交渉クールダウン中です (${currentPlayer.tradeCooldownTurns}ターン残り)。`);
+                    setTimeout(() => {
+                        if (currentPlayer.inJail) {
+                            handleJailTurn(currentPlayer, false);
+                        } else {
+                            rollDiceAndMove(currentPlayer);
+                        }
+                    }, 1000);
+                } else {
+                    const humanPlayer = players[0];
+                    const necessityPercentage = currentPlayer.necessityPercentage; 
+                    
+                    const debugDisplay = document.getElementById(`cpu-necessity-display-${currentPlayer.id}`);
+                    if (debugDisplay) {
+                        debugDisplay.textContent = `交渉必要度: ${necessityPercentage.toFixed(1)}%`;
                     }
-                }, 1000);
+
+                    if (Math.random() * 100 < necessityPercentage) {
+                        addLog(`${currentPlayer.name} は交渉を検討しています...`);
+                        const proposal = await generateTradeProposal(currentPlayer, humanPlayer);
+                        if (proposal) {
+                            activeCpuOffer = { cpu: currentPlayer, human: humanPlayer, proposal: proposal };
+                            showCpuOfferModal(proposal.message, proposal.yourOffer, proposal.theirOffer);
+                            return; // Pause turn for negotiation
+                        } else {
+                            addLog(`${currentPlayer.name} は適切な交渉案を見つけられませんでした。`);
+                            currentPlayer.tradeCooldownTurns = 2; // Short cooldown if no valid proposal
+                        }
+                    } else {
+                        addLog(`${currentPlayer.name} は交渉を行いません。`);
+                    }
+                    
+                    // Continue turn if no negotiation or proposal was made
+                    setTimeout(() => {
+                        if (currentPlayer.inJail) {
+                            handleJailTurn(currentPlayer, false);
+                        } else {
+                            rollDiceAndMove(currentPlayer);
+                        }
+                    }, 1000);
+                }
             }
         }
 
@@ -426,6 +643,144 @@
                 handleJailTurn(player, dice1 === dice2);
             } else {
                 movePlayerBy(player, dice1 + dice2);
+            }
+        }
+
+        function calculateTradeNecessity(cpuPlayer) {
+            let necessityScore = 0;
+            const humanPlayer = players[0];
+
+            // --- 1. 独占達成の可能性 (Monopoly Completion) ---
+            const colorGroups = getColorGroups();
+            for (const color in colorGroups) {
+                const groupProperties = colorGroups[color];
+                const cpuOwnedInGroup = groupProperties.filter(pIdx => boardData[pIdx].owner === cpuPlayer.id);
+                const humanOwnedInGroup = groupProperties.filter(pIdx => boardData[pIdx].owner === humanPlayer.id);
+
+                // CPUが独占寸前で、人間がその物件を持っている場合
+                if (cpuOwnedInGroup.length === groupProperties.length - 1 && humanOwnedInGroup.length === 1) {
+                    necessityScore += 40; // 高い優先度
+                    const avgPrice = groupProperties.reduce((sum, pIdx) => sum + boardData[pIdx].price, 0) / groupProperties.length;
+                    if (avgPrice > 20000) necessityScore += 10; // 高額なグループであればさらに加点
+                }
+            }
+
+            // --- 2. 資金状況 (Cash Flow / Liquidity) ---
+            const lowMoneyThreshold = 30000;
+            if (cpuPlayer.money < lowMoneyThreshold) {
+                necessityScore += (lowMoneyThreshold - cpuPlayer.money) / 1000; // 資金が少ないほど加点 (最大30点)
+            }
+            const excessMoneyThreshold = 150000;
+            if (cpuPlayer.money > excessMoneyThreshold && cpuPlayer.properties.length < 10) {
+                necessityScore += (cpuPlayer.money - excessMoneyThreshold) / 20000; // 資金が多いほど加点 (最大10点程度)
+            }
+
+            // --- 3. 不要な物件の有無 (Unwanted Properties) ---
+            let unwantedPropertiesCount = 0;
+            cpuPlayer.properties.forEach(pIdx => {
+                const prop = boardData[pIdx];
+                if (prop.type === 'property' && prop.color) {
+                    const groupProperties = colorGroups[prop.color];
+                    const cpuOwnedInGroup = groupProperties.filter(p => boardData[p].owner === cpuPlayer.id);
+                    if (cpuOwnedInGroup.length === 1 && groupProperties.length > 1) { // 孤立した物件
+                        unwantedPropertiesCount++;
+                    }
+                }
+            });
+            necessityScore += unwantedPropertiesCount * 5;
+
+            // --- 4. 相手の独占阻止 (Opponent's Monopoly Blocking) ---
+            for (const color in colorGroups) {
+                const groupProperties = colorGroups[color];
+                const cpuOwnedInGroup = groupProperties.filter(pIdx => boardData[pIdx].owner === cpuPlayer.id);
+                const humanOwnedInGroup = groupProperties.filter(pIdx => boardData[pIdx].owner === humanPlayer.id);
+
+                if (humanOwnedInGroup.length === groupProperties.length - 1 && cpuOwnedInGroup.length === 1) {
+                    necessityScore += 20; // 相手の独占阻止も重要
+                }
+            }
+
+            return Math.max(0, Math.min(100, necessityScore));
+        }
+
+        async function generateTradeProposal(cpuPlayer, humanPlayer) {
+            let yourOffer = { properties: [], money: 0 }; // CPUが提示するもの
+            let theirOffer = { properties: [], money: 0 }; // CPUが要求するもの
+
+            const cpuProperties = cpuPlayer.properties.map(pIdx => boardData[pIdx]);
+            const humanProperties = humanPlayer.properties.map(pIdx => boardData[pIdx]);
+
+            // --- 戦略1: 独占達成のための交渉 ---
+            const colorGroups = getColorGroups();
+            for (const color in colorGroups) {
+                const groupProperties = colorGroups[color];
+                const cpuOwnedInGroup = groupProperties.filter(pIdx => boardData[pIdx].owner === cpuPlayer.id);
+                const humanOwnedInGroup = groupProperties.filter(pIdx => boardData[pIdx].owner === humanPlayer.id);
+
+                if (cpuOwnedInGroup.length === groupProperties.length - 1 && humanOwnedInGroup.length === 1) {
+                    const targetProperty = humanOwnedInGroup[0]; // 人間が持っている、CPUが欲しい物件
+                    
+                    // CPUが提示できる物件を探す (不要な物件や安価な物件)
+                    const unwantedCpuProperties = cpuProperties.filter(p => {
+                        if (p.type === 'property' && p.color) {
+                            const pGroup = colorGroups[p.color];
+                            const pCpuOwned = pGroup.filter(idx => boardData[idx].owner === cpuPlayer.id);
+                            return pCpuOwned.length === 1 && pGroup.length > 1; // 孤立した物件
+                        }
+                        return false;
+                    });
+
+                    // 独占に必要な物件を要求
+                    theirOffer.properties.push(targetProperty.id);
+
+                    // 提示する物件や現金を決定
+                    if (unwantedCpuProperties.length > 0) {
+                        yourOffer.properties.push(unwantedCpuProperties[0].id);
+                        yourOffer.money = Math.floor(targetProperty.price * 0.1); // 少し現金を添える
+                    } else {
+                        yourOffer.money = Math.floor(targetProperty.price * 0.5); // 物件がなければ現金を多めに
+                    }
+                    break; // 最も優先度の高い独占交渉が見つかったら終了
+                }
+            }
+
+            // --- 戦略2: 資金調達のための交渉 (独占交渉がなければ) ---
+            if (theirOffer.properties.length === 0 && cpuPlayer.money < 50000) {
+                const sellableProperties = cpuProperties.filter(p => p.type === 'property' && p.houses === 0); // 家が建っていない物件
+                if (sellableProperties.length > 0) {
+                    yourOffer.properties.push(sellableProperties[0].id);
+                    theirOffer.money = Math.floor(sellableProperties[0].price * 0.7); // 7割程度の現金を要求
+                }
+            }
+
+            // 交渉内容が空の場合は交渉しない
+            if (yourOffer.properties.length === 0 && yourOffer.money === 0 && theirOffer.properties.length === 0 && theirOffer.money === 0) {
+                return null;
+            }
+
+            // LLMにメッセージを生成させる
+            try {
+                const response = await fetch('/cpu-propose-message', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        cpu: cpuPlayer,
+                        player: humanPlayer,
+                        offer: yourOffer,
+                        request: theirOffer,
+                        boardData
+                    })
+                });
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Server responded with status ${response.status}: ${errorText}`);
+                }
+                const result = await response.json();
+                return { message: result.message, yourOffer, theirOffer };
+            } catch (error) {
+                console.error('Error generating CPU proposal message:', error);
+                addLog(`CPU交渉メッセージ生成エラー: ${error.message || error}`);
+                return null;
             }
         }
 
@@ -536,7 +891,7 @@
                 const ownedCount = owner.properties.filter(pIdx => boardData[pIdx].type === 'utility').length;
                 if (ownedCount === 1) rent = diceRoll * 400;
                 else if (ownedCount === 2) rent = diceRoll * 1000;
-                else if (ownedCount === 3) rent = diceRoll * 2000; // New rent for 3 utilities
+                else if (ownedCount === 3) rent = diceRoll * 2000;
                 addLog(`ユーティリティのレンタル料として ${diceRoll} x ${rent / diceRoll} を計算。`);
             } else if (space.type === 'railroad') {
                 const ownedCount = owner.properties.filter(pIdx => boardData[pIdx].type === 'railroad').length;
@@ -545,7 +900,7 @@
                 const ownedGroup = getColorGroups()[space.color].every(pIdx => boardData[pIdx].owner === owner.id);
                 rent = space.rentLevels[space.houses];
                 if (space.houses === 0 && ownedGroup) {
-                    rent *= 2; // Double rent for owning all properties in a color group
+                    rent *= 2;
                 }
             }
 
@@ -571,21 +926,7 @@
             while(players[currentPlayerIndex].money < 0) {
                 currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
             }
-            setTimeout(startTurn, 500); // Slightly faster turn transition
-        }
-
-        function updateOwnedIndicator(spaceIndex) {
-            const space = boardData[spaceIndex];
-            const spaceEl = document.getElementById(`space-${spaceIndex}`);
-            const existing = spaceEl.querySelector('.owned-indicator');
-            if(existing) existing.remove();
-            if (space.owner !== -1) {
-                const owner = players[space.owner];
-                const indicator = document.createElement('div');
-                indicator.className = 'owned-indicator';
-                indicator.style.backgroundColor = owner.color;
-                spaceEl.appendChild(indicator);
-            }
+            setTimeout(startTurn, 500);
         }
         
         function goToJail(player) {
@@ -644,7 +985,7 @@
             if (nearestPos !== -1) {
                 movePlayerTo(player, nearestPos, nearestPos < currentPos);
             } else {
-                endTurn(); // Should not happen
+                endTurn();
             }
         }
         
@@ -657,9 +998,9 @@
             });
             player.properties = [];
             const remainingPlayers = players.filter(p => p.money >= 0);
-            if (remainingPlayers.length <= 1) { // Changed to <= 1 to handle final player
+            if (remainingPlayers.length <= 1) {
                 isGameOver = true;
-                const winner = remainingPlayers.length > 0 ? remainingPlayers[0] : players.find(p => p.id !== player.id); // Find winner
+                const winner = remainingPlayers.length > 0 ? remainingPlayers[0] : players.find(p => p.id !== player.id);
                 addLog(`ゲーム終了！ ${winner.name} の勝利です！`);
                 DOM.turnIndicator.textContent = `${winner.name} の勝利！`;
                 DOM.rollDiceBtn.disabled = true;
@@ -704,7 +1045,7 @@
                 info += '<h4 class="font-bold text-lg border-b mb-2">レンタル料</h4>';
                 info += '<p>1つ所有: サイコロの目 x 400円</p>';
                 info += '<p>2つ所有: サイコロの目 x 1000円</p>';
-                info += '<p>3つ所有: サイコロの目 x 2000円</p>'; // New display for 3 utilities
+                info += '<p>3つ所有: サイコロの目 x 2000円</p>';
             }
 
             DOM.modalPropertyInfo.innerHTML = info;
@@ -721,7 +1062,7 @@
 
             Object.entries(colorGroups).forEach(([color, propertiesInGroup]) => {
                 const ownedProperties = propertiesInGroup.filter(pIdx => boardData[pIdx].owner === player.id);
-                if (ownedProperties.length === propertiesInGroup.length) { // Complete set
+                if (ownedProperties.length === propertiesInGroup.length) {
                     hasBuildableGroups = true;
                     const groupEl = document.createElement('div');
                     groupEl.className = 'mb-4 p-3 bg-gray-50 rounded-lg border';
@@ -751,7 +1092,7 @@
                 addLog(`${player.name} が ${prop.name} に家を建てた (現在 ${prop.houses} 軒)`);
                 updatePlayerInfo(player);
                 updateBoardUI(propIndex);
-                openManageAssetsModal(); // Refresh modal
+                openManageAssetsModal();
             }
         }
 
@@ -802,6 +1143,207 @@
             });
             return groups;
         }
+
+        // --- Trade Logic ---
+        window.openTradeModal = function(partnerId) {
+            tradePartnerId = partnerId;
+            const player = players[0];
+            const partner = players[partnerId];
+
+            DOM.tradeModalTitle.textContent = `${partner.name} との交渉`;
+            DOM.tradeYourOfferTitle.textContent = `あなたの提示 (所持金: ¥${player.money.toLocaleString()})`;
+            DOM.tradeTheirOfferTitle.textContent = `${partner.name}の提示 (所持金: ¥${partner.money.toLocaleString()})`;
+
+            const populateTradeList = (element, owner, isPlayer) => {
+                element.innerHTML = '';
+                const properties = owner.properties.map(pIdx => boardData[pIdx]);
+                if (properties.length === 0) {
+                    element.innerHTML = '<p class="text-xs text-gray-500 italic">物件なし</p>';
+                    return;
+                }
+                properties.forEach(prop => {
+                    element.innerHTML += `
+                        <label class="flex items-center space-x-2 text-sm">
+                            <input type="checkbox" class="form-checkbox h-4 w-4 text-blue-600" data-property-id="${prop.id}" ${isPlayer ? '' : 'disabled'}>
+                            <span>${prop.name}</span>
+                        </label>
+                    `;
+                });
+            };
+
+            populateTradeList(DOM.tradeYourProperties, player, true);
+            populateTradeList(DOM.tradeTheirProperties, partner, false);
+            
+            DOM.tradeYourMoney.value = 0;
+            DOM.tradeTheirMoney.value = 0;
+            DOM.tradeMessage.value = '';
+            DOM.tradeCpuResponse.classList.add('hidden');
+            DOM.tradeModal.classList.remove('hidden');
+        }
+
+        async function handleTradeProposal() {
+            const player = players[0];
+            const partner = players[tradePartnerId];
+
+            const getOffer = (containerId, moneyId) => {
+                const properties = [...document.querySelectorAll(`#${containerId} input:checked`)].map(el => parseInt(el.dataset.propertyId));
+                const money = parseInt(document.getElementById(moneyId).value) || 0;
+                return { properties, money };
+            };
+
+            const yourOffer = getOffer('trade-your-properties', 'trade-your-money');
+            const theirOffer = getOffer('trade-their-properties', 'trade-their-money');
+            const message = DOM.tradeMessage.value;
+
+            if (yourOffer.money > player.money || theirOffer.money > partner.money) {
+                alert('所持金を超える現金は提示できません。');
+                return;
+            }
+
+            DOM.tradeProposeBtn.disabled = true;
+            DOM.tradeProposeBtn.textContent = 'AIが思考中...';
+
+            try {
+                const response = await fetch('/negotiate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        player,
+                        partner,
+                        yourOffer,
+                        theirOffer,
+                        message,
+                        boardData
+                    })
+                });
+                const result = await response.json();
+                
+                DOM.tradeCpuResponse.innerHTML = `<p class="font-bold">${partner.name}の返答:</p><p>${result.response_text}</p>`;
+                DOM.tradeCpuResponse.classList.remove('hidden');
+
+                if (result.decision === 'accept') {
+                    addLog(`交渉成立！ ${player.name} と ${partner.name} の間で取引が行われました。`);
+                    processTrade(player, partner, yourOffer, theirOffer);
+                    setTimeout(() => DOM.tradeModal.classList.add('hidden'), 2000);
+                } else if (result.decision === 'counter') {
+                    addLog(`${partner.name} から再提案がありました。`);
+                    updateTradeModalForCounter(result.counter_offer, result.counter_request);
+                } else { // reject
+                    addLog(`${partner.name} は交渉を拒否しました。`);
+                }
+
+            } catch (error) {
+                console.error('Negotiation error:', error);
+                DOM.tradeCpuResponse.innerHTML = '<p>交渉中にエラーが発生しました。</p>';
+                DOM.tradeCpuResponse.classList.remove('hidden');
+            } finally {
+                DOM.tradeProposeBtn.disabled = false;
+                DOM.tradeProposeBtn.textContent = '提案する';
+            }
+        }
+        
+        function updateTradeModalForCounter(counterOffer, counterRequest) {
+            document.querySelectorAll('#trade-your-properties input, #trade-their-properties input').forEach(el => el.checked = false);
+            
+            counterOffer.properties.forEach(pId => {
+                const checkbox = document.querySelector(`#trade-their-properties input[data-property-id="${pId}"]`);
+                if (checkbox) checkbox.checked = true;
+            });
+            DOM.tradeTheirMoney.value = counterOffer.money;
+
+            counterRequest.properties.forEach(pId => {
+                const checkbox = document.querySelector(`#trade-your-properties input[data-property-id="${pId}"]`);
+                if (checkbox) checkbox.checked = true;
+            });
+            DOM.tradeYourMoney.value = counterRequest.money;
+        }
+
+        function processTrade(playerA, playerB, offerA, offerB) {
+            // Exchange money
+            playerA.money -= offerA.money;
+            playerB.money += offerA.money;
+            playerB.money -= offerB.money;
+            playerA.money += offerB.money;
+
+            // Exchange properties from A to B
+            offerA.properties.forEach(pIdx => {
+                playerA.properties = playerA.properties.filter(id => id !== pIdx);
+                playerB.properties.push(pIdx);
+                boardData[pIdx].owner = playerB.id;
+                updateBoardUI(pIdx);
+            });
+
+            // Exchange properties from B to A
+            offerB.properties.forEach(pIdx => {
+                playerB.properties = playerB.properties.filter(id => id !== pIdx);
+                playerA.properties.push(pIdx);
+                boardData[pIdx].owner = playerA.id;
+                updateBoardUI(pIdx);
+            });
+
+            // Update UI
+            updatePlayerInfo(playerA);
+            updatePlayerInfo(playerB);
+        }
+
+        // --- CPU Offer Handling ---
+        function showCpuOfferModal(message, cpuOffer, cpuRequest) {
+            DOM.cpuOfferTitle.textContent = `${activeCpuOffer.cpu.name} からの交渉提案`;
+            DOM.cpuOfferText.textContent = message;
+
+            const formatOffer = (properties, money) => {
+                let html = '';
+                if (properties.length > 0) {
+                    html += `<p class="font-bold">物件:</p><ul>`;
+                    properties.forEach(pId => {
+                        html += `<li>${boardData[pId]?.name || '不明な物件'}</li>`;
+                    });
+                    html += `</ul>`;
+                }
+                if (money > 0) {
+                    html += `<p class="font-bold">現金: ¥${money.toLocaleString()}</p>`;
+                }
+                if (properties.length === 0 && money === 0) {
+                    html += `<p class="italic text-gray-500">なし</p>`;
+                }
+                return html;
+            };
+
+            DOM.cpuOfferProposal.innerHTML = formatOffer(cpuOffer.properties, cpuOffer.money);
+            DOM.cpuOfferRequest.innerHTML = formatOffer(cpuRequest.properties, cpuRequest.money);
+
+            DOM.cpuOfferModal.classList.remove('hidden');
+        }
+
+        async function handleCpuOfferAccept() {
+            const { cpu, human, proposal } = activeCpuOffer;
+            addLog(`${human.name} は ${cpu.name} の提案を承諾しました。`);
+            processTrade(human, cpu, proposal.theirOffer, proposal.yourOffer); // human gives theirOffer, cpu gives yourOffer
+            cpu.tradeCooldownTurns = 0; // 交渉成立でクールダウン解除
+            DOM.cpuOfferModal.classList.add('hidden');
+            endTurn(); // CPUのターンを終了
+        }
+
+        function handleCpuOfferReject() {
+            const { cpu, human } = activeCpuOffer;
+            addLog(`${human.name} は ${cpu.name} の提案を拒否しました。`);
+            cpu.tradeCooldownTurns = 5; // 拒否されたらクールダウン
+            DOM.cpuOfferModal.classList.add('hidden');
+            endTurn(); // CPUのターンを終了
+        }
+
+        function handleCpuOfferCounter() {
+            const { cpu, human, proposal } = activeCpuOffer;
+            addLog(`${human.name} は ${cpu.name} の提案に再提案します。`);
+            DOM.cpuOfferModal.classList.add('hidden');
+            
+            // 人間がCPUに再提案する形でtradeModalを開く
+            openTradeModal(cpu.id);
+            // CPUの提案内容を人間の「要求」として、人間の「提示」として設定
+            updateTradeModalForCounter(proposal.yourOffer, proposal.theirOffer);
+            isCounteringCpuOffer = true; // 再提案中フラグ
+        }
+
 
         window.onload = initGame;
     </script>

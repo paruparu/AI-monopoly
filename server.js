@@ -6,6 +6,13 @@ require('dotenv').config(); // Load environment variables from .env file
 const app = express();
 const port = 3000;
 
+// --- Part 1: Check OPENAI_API_KEY on startup ---
+if (!process.env.OPENAI_API_KEY) {
+  console.error('Error: OPENAI_API_KEY is not set in the .env file.');
+  console.error('Please create a .env file in the root directory and add OPENAI_API_KEY=YOUR_API_KEY_HERE');
+  process.exit(1); // Exit the process with an error code
+}
+
 // Middleware to parse JSON bodies
 app.use(express.json());
 
@@ -23,21 +30,24 @@ app.get('/', (req, res) => {
 
 // New endpoint for AI negotiation
 app.post('/cpu-propose-message', async (req, res) => {
+  // --- Part 2: Log incoming request body for debugging ---
+  console.log('Received /cpu-propose-message request body:', JSON.stringify(req.body, null, 2));
+
   const { cpu, player, offer, request, boardData } = req.body;
 
   try {
     const prompt = `あなたはモノポリーゲームのCPUプレイヤーです。人間プレイヤー（${player.name}）に交渉を提案します。以下の条件で提案する際のメッセージを生成してください。
 あなたのプレイヤー名: ${cpu.name}
 あなたの所持金: ¥${cpu.money.toLocaleString()}
-あなたの所有物件: ${cpu.properties.map(pIdx => boardData[pIdx].name).join(', ') || 'なし'}
+あなたの所有物件: ${cpu.properties.filter(pIdx => pIdx !== null && pIdx !== undefined).map(pIdx => boardData[pIdx]?.name).join(', ') || 'なし'}
 
 あなたが提案する内容:
-- 提示物件: ${offer.properties.map(pIdx => boardData[pIdx].name).join(', ') || 'なし'}
-- 提示現金: ¥${offer.money.toLocaleString()}
+- 提示物件: ${offer.properties.filter(pIdx => pIdx !== null && pIdx !== undefined).map(pIdx => boardData[pIdx]?.name).join(', ') || 'なし'}
+- 提示現金: ¥${(offer.money || 0).toLocaleString()}
 
 あなたが要求する内容:
-- 要求物件: ${request.properties.map(pIdx => boardData[pIdx].name).join(', ') || 'なし'}
-- 要求現金: ¥${request.money.toLocaleString()}
+- 要求物件: ${request.properties.filter(pIdx => pIdx !== null && pIdx !== undefined).map(pIdx => boardData[pIdx]?.name).join(', ') || 'なし'}
+- 要求現金: ¥${(request.money || 0).toLocaleString()}
 
 メッセージは簡潔に、かつ交渉の意図が伝わるようにしてください。
 あなたのメッセージ:`;
@@ -59,6 +69,9 @@ app.post('/cpu-propose-message', async (req, res) => {
 
 // New endpoint for CPU to CPU negotiation
 app.post('/cpu-to-cpu-negotiate', async (req, res) => {
+  // --- Part 2: Log incoming request body for debugging ---
+  console.log('Received /cpu-to-cpu-negotiate request body:', JSON.stringify(req.body, null, 2));
+
   const { offeringCpu, targetCpu, offer, request, boardData } = req.body;
 
   try {
@@ -66,15 +79,15 @@ app.post('/cpu-to-cpu-negotiate', async (req, res) => {
 
 あなたのプレイヤー名: ${targetCpu.name}
 あなたの所持金: ¥${targetCpu.money.toLocaleString()}
-あなたの所有物件: ${targetCpu.properties.map(pIdx => boardData[pIdx].name).join(', ') || 'なし'}
+あなたの所有物件: ${targetCpu.properties.filter(pIdx => pIdx !== null && pIdx !== undefined).map(pIdx => boardData[pIdx]?.name).join(', ') || 'なし'}
 
 相手プレイヤー（${offeringCpu.name}）の提案:
-- 提示物件: ${offer.properties.map(pIdx => boardData[pIdx].name).join(', ') || 'なし'}
-- 提示現金: ¥${offer.money.toLocaleString()}
+- 提示物件: ${offer.properties.filter(pIdx => pIdx !== null && pIdx !== undefined).map(pIdx => boardData[pIdx]?.name).join(', ') || 'なし'}
+- 提示現金: ¥${(offer.money || 0).toLocaleString()}
 
 あなたが要求されているもの:
-- 要求物件: ${request.properties.map(pIdx => boardData[pIdx].name).join(', ') || 'なし'}
-- 要求現金: ¥${request.money.toLocaleString()}
+- 要求物件: ${request.properties.filter(pIdx => pIdx !== null && pIdx !== undefined).map(pIdx => boardData[pIdx]?.name).join(', ') || 'なし'}
+- 要求現金: ¥${(request.money || 0).toLocaleString()}
 
 あなたの返答は、以下のJSON形式でお願いします。
 {
@@ -104,10 +117,24 @@ app.post('/cpu-to-cpu-negotiate', async (req, res) => {
 });
 
 app.post('/negotiate', async (req, res) => {
+  // --- Part 2: Log incoming request body for debugging ---
+  console.log('Received /negotiate request body:', JSON.stringify(req.body, null, 2));
+
   const { player, partner, yourOffer, theirOffer, message, boardData } = req.body;
 
   try {
-    const prompt = `あなたはモノポリーゲームのCPUプレイヤーです。以下の交渉提案について、相手プレイヤー（人間）に返答してください。\n\n現在の状況:\n- あなたのプレイヤー名: ${partner.name}\n- あなたの所持金: ¥${partner.money.toLocaleString()}\n- あなたの所有物件: ${partner.properties.map(pIdx => boardData[pIdx].name).join(', ') || 'なし'}\n\n相手プレイヤー（${player.name}）の提案:\n- 提示物件: ${yourOffer.properties.map(pIdx => boardData[pIdx].name).join(', ') || 'なし'}\n- 提示現金: ¥${yourOffer.money.toLocaleString()}\n\nあなたが要求されているもの:\n- 要求物件: ${theirOffer.properties.map(pIdx => boardData[pIdx].name).join(', ') || 'なし'}\n- 要求現金: ¥${theirOffer.money.toLocaleString()}\n\n相手からのメッセージ: "${message}"\n\nあなたの返答は、以下のJSON形式でお願いします。\n{\n  "decision": "accept" | "reject" | "counter",\n  "response_text": "[返答メッセージ]",\n  "counter_offer": {\n    "properties": [物件ID],\n    "money": [金額]\n  },\n  "counter_request": {\n    "properties": [物件ID],\n    "money": [金額]\n  }\n}\n\n- 'decision'は'accept'（受け入れる）、'reject'（拒否する）、'counter'（再提案する）のいずれかです。\n- 'response_text'は相手へのメッセージです。\n- 'counter'の場合のみ'counter_offer'と'counter_request'を含めてください。\n- 'counter_offer'はあなたが相手に提示する物件と現金、'counter_request'はあなたが相手に要求する物件と現金です。\n- 物件IDはboardDataのインデックスです。\n\nあなたの返答:`;
+    const prompt = `あなたはモノポリーゲームのCPUプレイヤーです。以下の交渉提案について、相手プレイヤー（人間）に返答してください。\n\n現在の状況:
+- あなたのプレイヤー名: ${partner.name}
+- あなたの所持金: ¥${(partner.money || 0).toLocaleString()}
+- あなたの所有物件: ${partner.properties.filter(pIdx => pIdx !== null && pIdx !== undefined).map(pIdx => boardData[pIdx]?.name).join(', ') || 'なし'}
+
+相手プレイヤー（${player.name}）の提案:
+- 提示物件: ${yourOffer.properties.filter(pIdx => pIdx !== null && pIdx !== undefined).map(pIdx => boardData[pIdx]?.name).join(', ') || 'なし'}
+- 提示現金: ¥${(yourOffer.money || 0).toLocaleString()}
+
+あなたが要求されているもの:
+- 要求物件: ${theirOffer.properties.filter(pIdx => pIdx !== null && pIdx !== undefined).map(pIdx => boardData[pIdx]?.name).join(', ') || 'なし'}
+- 要求現金: ¥${(theirOffer.money || 0).toLocaleString()}\n\n相手からのメッセージ: "${message}"\n\nあなたの返答は、以下のJSON形式でお願いします。\n{\n  "decision": "accept" | "reject" | "counter",\n  "response_text": "[返答メッセージ]",\n  "counter_offer": {\n    "properties": [物件ID],\n    "money": [金額]\n  },\n  "counter_request": {\n    "properties": [物件ID],\n    "money": [金額]\n  }\n}\n\n- 'decision'は'accept'（受け入れる）、'reject'（拒否する）、'counter'（再提案する）のいずれかです。\n- 'response_text'は相手へのメッセージです。\n- 'counter'の場合のみ'counter_offer'と'counter_request'を含めてください。\n- 'counter_offer'はあなたが相手に提示する物件と現金、'counter_request'はあなたが相手に要求する物件と現金です。\n- 物件IDはboardDataのインデックスです。\n\nあなたの返答:`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo", // You can choose a different model like "gpt-4" if available
