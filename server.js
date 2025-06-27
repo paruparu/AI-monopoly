@@ -4,7 +4,8 @@ const OpenAI = require('openai');
 require('dotenv').config(); // Load environment variables from .env file
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
+const isProduction = process.env.NODE_ENV === 'production';
 
 // --- Part 1: Check OPENAI_API_KEY on startup ---
 if (!process.env.OPENAI_API_KEY) {
@@ -153,5 +154,8 @@ app.post('/negotiate', async (req, res) => {
 });
 
 app.listen(port, () => {
+  if (!isProduction) {
+    console.log(`Server is running in ${isProduction ? 'production' : 'development'} mode on port ${port}`);
+  }
   console.log(`Server listening at http://localhost:${port}`);
 });
