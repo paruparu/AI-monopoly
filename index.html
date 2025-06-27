@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>マルチプレイヤー・モノポリー (CPU交渉機能付き)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'M PLUS Rounded 1c', sans-serif; }
+        .game-layout { display: flex; flex-direction: column; align-items: flex-start; gap: 20px; }
+        @media (min-width: 1280px) { .game-layout { flex-direction: row; } }
+        .board {
+            display: grid;
+            grid-template-columns: 100px repeat(9, minmax(60px, 1fr)) 100px;
+            grid-template-rows: 100px repeat(9, minmax(60px, 1fr)) 100px;
+            gap: 2px; width: 100%; max-width: 800px; background-color: #1a202c;
+            border: 4px solid #1a202c; border-radius: 10px; aspect-ratio: 1 / 1;
+            position: relative;
+        }
+        #space-0 { grid-area: 11 / 11 / 12 / 12; } #space-1 { grid-area: 11 / 10 / 12 / 11; }
+        #space-2 { grid-area: 11 / 9 / 12 / 10; } #space-3 { grid-area: 11 / 8 / 12 / 9; }
+        #space-4 { grid-area: 11 / 7 / 12 / 8; } #space-5 { grid-area: 11 / 6 / 12 / 7; }
+        #space-6 { grid-area: 11 / 5 / 12 / 6; } #space-7 { grid-area: 11 / 4 / 12 / 5; }
+        #space-8 { grid-area: 11 / 3 / 12 / 4; } #space-9 { grid-area: 11 / 2 / 12 / 3; }
+        #space-10 { grid-area: 11 / 1 / 12 / 2; } #space-11 { grid-area: 10 / 1 / 11 / 2; }
+        #space-12 { grid-area: 9 / 1 / 10 / 2; } #space-13 { grid-area: 8 / 1 / 9 / 2; }
+        #space-14 { grid-area: 7 / 1 / 8 / 2; } #space-15 { grid-area: 6 / 1 / 7 / 2; }
+        #space-16 { grid-area: 5 / 1 / 6 / 2; } #space-17 { grid-area: 4 / 1 / 5 / 2; }
+        #space-18 { grid-area: 3 / 1 / 4 / 2; } #space-19 { grid-area: 2 / 1 / 3 / 2; }
+        #space-20 { grid-area: 1 / 1 / 2 / 2; } #space-21 { grid-area: 1 / 2 / 2 / 3; }
+        #space-22 { grid-area: 1 / 3 / 2 / 4; } #space-23 { grid-area: 1 / 4 / 2 / 5; }
+        #space-24 { grid-area: 1 / 5 / 2 / 6; } #space-25 { grid-area: 1 / 6 / 2 / 7; }
+        #space-26 { grid-area: 1 / 7 / 2 / 8; } #space-27 { grid-area: 1 / 8 / 2 / 9; }
+        #space-28 { grid-area: 1 / 9 / 2 / 10; } #space-29 { grid-area: 1 / 10 / 2 / 11; }
+        #space-30 { grid-area: 1 / 11 / 2 / 12; } #space-31 { grid-area: 2 / 11 / 3 / 12; }
+        #space-32 { grid-area: 3 / 11 / 4 / 12; } #space-33 { grid-area: 4 / 11 / 5 / 12; }
+        #space-34 { grid-area: 5 / 11 / 6 / 12; } #space-35 { grid-area: 6 / 11 / 7 / 12; }
+        #space-36 { grid-area: 7 / 11 / 8 / 12; } #space-37 { grid-area: 8 / 11 / 9 / 12; }
+        #space-38 { grid-area: 9 / 11 / 10 / 12; } #space-39 { grid-area: 10 / 11 / 11 / 12; }
+        
+        #board-center {
+            grid-area: 2 / 2 / 11 / 11;
+            background-color: white;
+            border: 2px solid #1a202c;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-align: center;
+            padding: 1rem;
+            z-index: 1;
+        }
+        .space {
+            background-color: #f0f8ff; border: 1px solid #cbd5e0; position: relative; display: flex;
+            flex-direction: column; justify-content: space-between; align-items: center;
+            padding: 2px; font-size: 10px; text-align: center; overflow: hidden; cursor: pointer;
+        }
+        .space .space-name { flex-grow: 1; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .space .price { font-size: 9px; }
+        .color-bar { width: 100%; height: 20%; flex-shrink: 0; }
+        .player-token { position: absolute; width: 20px; height: 20px; border: 2px solid white; border-radius: 50%; z-index: 10; transition: all 0.5s ease-in-out; box-shadow: 0 0 5px black; }
+        .owned-indicator { position: absolute; bottom: 2px; right: 2px; width: 15px; height: 15px; border-radius: 50%; border: 1px solid white; box-shadow: 0 0 3px black; }
+        .house-indicator { position: absolute; top: 0px; left: 0px; width: 100%; display: flex; justify-content: center; gap: 1px; }
+        .house-icon { width: 10px; height: 10px; background-color: green; border: 1px solid white; }
+        .hotel-icon { width: 15px; height: 15px; background-color: red; border: 1px solid white; font-size: 10px; color: white; text-align: center; font-weight: bold; }
+        .modal { transition: opacity 0.3s ease; }
+        .trade-property-list { max-height: 150px; overflow-y: auto; border: 1px solid #ccc; padding: 5px; border-radius: 5px; }
+        .trade-property-list label { display: block; margin-bottom: 5px; cursor: pointer; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 flex flex-col items-center p-4">
+    <h1 class="text-4xl font-extrabold mb-4 text-gray-700">AI交渉モノポリー</h1>
+
+    <div class="game-layout w-full max-w-screen-2xl">
+        <div id="board" class="board"><div id="board-center">日本周遊</div></div>
+        <div class="info-panel flex-grow w-full xl:max-w-md bg-white p-4 rounded-lg shadow-lg">
+            <div id="players-info-container" class="mb-4">
+                <h2 class="text-2xl font-bold border-b-2 pb-2 mb-2">プレイヤー情報</h2>
+            </div>
+            <div class="action-area bg-gray-100 p-4 rounded-lg shadow-inner">
+                <h3 id="turn-indicator" class="text-xl font-bold text-center mb-4">あなたの番です</h3>
+                <div id="action-panel" class="mb-4 text-center hidden">
+                    <h4 id="action-title" class="font-bold"></h4><p id="action-text" class="my-2"></p>
+                    <div id="action-buttons">
+                        <button id="action-buy-btn" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">購入</button>
+                        <button id="action-pass-btn" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">やめる</button>
+                    </div>
+                </div>
+                <div id="dice-area" class="text-center">
+                    <div class="flex justify-center gap-4 mb-2">
+                        <div id="dice1" class="w-12 h-12 bg-white rounded-lg flex items-center justify-center text-2xl font-bold shadow-lg">?</div>
+                        <div id="dice2" class="w-12 h-12 bg-white rounded-lg flex items-center justify-center text-2xl font-bold shadow-lg">?</div>
+                    </div>
+                    <div class="flex gap-2 mt-2">
+                        <button id="roll-dice-btn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-xl w-full">サイコロを振る</button>
+                        <button id="manage-assets-btn" class="bg-purple-500 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg shadow-xl w-full">資産管理</button>
+                    </div>
+                </div>
+            </div>
+            <div id="log-area" class="w-full mt-4">
+                <h3 class="font-bold text-center">ゲームログ</h3>
+                <div id="log-messages" class="h-48 overflow-y-auto text-sm p-2 bg-gray-100 rounded shadow-inner"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Property Modal -->
+    <div id="property-modal" class="modal hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+        <div class="bg-white p-6 rounded-lg shadow-2xl max-w-sm w-full">
+            <div id="modal-color-bar" class="w-full h-4 rounded-t-lg mb-4"></div>
+            <h3 id="modal-property-name" class="text-3xl font-bold mb-2 text-center"></h3>
+            <div id="modal-property-info" class="text-lg space-y-2"></div>
+            <button id="modal-close-btn" class="mt-6 w-full bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">閉じる</button>
+        </div>
+    </div>
+    
+    <!-- Manage Assets Modal -->
+    <div id="manage-assets-modal" class="modal hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+        <div class="bg-white p-6 rounded-lg shadow-2xl max-w-lg w-full">
+            <h3 class="text-2xl font-bold mb-4">資産管理 (建築)</h3>
+            <div id="asset-groups-container" class="max-h-96 overflow-y-auto space-y-4"></div>
+            <button id="manage-assets-close-btn" class="mt-6 w-full bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">閉じる</button>
+        </div>
+    </div>
+
+    <!-- Trade Modal -->
+    <div id="trade-modal" class="modal hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+        <div class="bg-white p-6 rounded-lg shadow-2xl max-w-2xl w-full">
+            <h3 id="trade-modal-title" class="text-2xl font-bold mb-4">交渉</h3>
+            <div id="trade-cpu-response" class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4 hidden" role="alert"></div>
+            <div class="grid grid-cols-2 gap-6">
+                <div>
+                    <h4 class="font-bold text-lg mb-2" id="trade-your-offer-title">あなたの提示</h4>
+                    <div class="trade-property-list bg-gray-50" id="trade-your-properties"></div>
+                    <div class="mt-2">現金: ¥ <input type="number" id="trade-your-money" class="w-32 border rounded p-1" value="0" min="0"></div>
+                </div>
+                <div>
+                    <h4 class="font-bold text-lg mb-2" id="trade-their-offer-title">相手の提示</h4>
+                    <div class="trade-property-list bg-gray-50" id="trade-their-properties"></div>
+                    <div class="mt-2">現金: ¥ <input type="number" id="trade-their-money" class="w-32 border rounded p-1" value="0" min="0"></div>
+                </div>
+            </div>
+            <div class="mt-4">
+                <label for="trade-message" class="font-bold">メッセージ:</label>
+                <textarea id="trade-message" class="w-full border rounded p-2 mt-1" placeholder="CPUへのメッセージを入力..."></textarea>
+            </div>
+            <div class="mt-6 flex justify-end gap-4">
+                <button id="trade-cancel-btn" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">やめる</button>
+                <button id="trade-propose-btn" class="bg-green-600 hover:bg-green-800 text-white font-bold py-2 px-4 rounded">提案する</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- CPU Offer Modal -->
+    <div id="cpu-offer-modal" class="modal hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+        <div class="bg-white p-6 rounded-lg shadow-2xl max-w-lg w-full">
+            <h3 id="cpu-offer-title" class="text-2xl font-bold mb-4">交渉の提案</h3>
+            <p id="cpu-offer-text" class="mb-4"></p>
+            <div class="grid grid-cols-2 gap-6 bg-gray-50 p-4 rounded-lg">
+                <div><h4 class="font-bold text-lg mb-2">要求されている資産</h4><div id="cpu-offer-request"></div></div>
+                <div><h4 class="font-bold text-lg mb-2">提示されている資産</h4><div id="cpu-offer-proposal"></div></div>
+            </div>
+            <div class="mt-6 flex justify-end gap-4">
+                <button id="cpu-offer-reject-btn" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">拒否</button>
+                <button id="cpu-offer-counter-btn" class="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded">再提案</button>
+                <button id="cpu-offer-accept-btn" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">承諾</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CPU Trade Log Modal -->
+    <div id="cpu-trade-log-modal" class="modal hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+        <div class="bg-white p-6 rounded-lg shadow-2xl max-w-lg w-full">
+            <h3 id="cpu-trade-log-title" class="text-2xl font-bold mb-4">CPU同士の交渉</h3>
+            <div class="grid grid-cols-2 gap-6 bg-gray-50 p-4 rounded-lg">
+                <div><h4 class="font-bold text-lg mb-2">提示</h4><div id="cpu-trade-log-offer"></div></div>
+                <div><h4 class="font-bold text-lg mb-2">要求</h4><div id="cpu-trade-log-request"></div></div>
+            </div>
+            <div id="cpu-trade-log-response" class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 mt-4" role="alert"></div>
+            <button id="cpu-trade-log-close-btn" class="mt-6 w-full bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">閉じる</button>
+        </div>
+    </div>
+
+    <!-- Main Game Script -->
+    <script>
+        // --- Game Data ---
+        const boardData = [
+            { name: 'GO', type: 'go' },
+            { name: '沖縄', price: 6000, rentLevels: [200, 1000, 3000, 9000, 16000, 25000], color: '#a52a2a', houseCost: 5000 },
+            { name: 'チャンス', type: 'chance' },
+            { name: '福岡', price: 6000, rentLevels: [400, 2000, 6000, 18000, 32000, 45000], color: '#a52a2a', houseCost: 5000 },
+            { name: '所得税', type: 'tax', amount: 20000 },
+            { name: '鉄道:南', price: 20000, rent: 2500, type: 'railroad' },
+            { name: '大阪', price: 10000, rentLevels: [600, 3000, 9000, 27000, 40000, 55000], color: '#add8e6', houseCost: 5000 },
+            { name: 'チャンス', type: 'chance' },
+            { name: '京都', price: 10000, rentLevels: [600, 3000, 9000, 27000, 40000, 55000], color: '#add8e6', houseCost: 5000 },
+            { name: '名古屋', price: 12000, rentLevels: [800, 4000, 10000, 30000, 45000, 60000], color: '#add8e6', houseCost: 6000 },
+            { name: '刑務所', type: 'jail' },
+            { name: '静岡', price: 14000, rentLevels: [1000, 5000, 15000, 45000, 62500, 75000], color: '#d8bfd8', houseCost: 10000 },
+            { name: '電力会社', price: 15000, type: 'utility' },
+            { name: '横浜', price: 14000, rentLevels: [1000, 5000, 15000, 45000, 62500, 75000], color: '#d8bfd8', houseCost: 10000 },
+            { name: '千葉', price: 16000, rentLevels: [1200, 6000, 18000, 50000, 70000, 90000], color: '#d8bfd8', houseCost: 10000 },
+            { name: '鉄道:西', price: 20000, rent: 2500, type: 'railroad' },
+            { name: '埼玉', price: 18000, rentLevels: [1400, 7000, 20000, 55000, 75000, 95000], color: '#ffa500', houseCost: 10000 },
+            { name: 'チャンス', type: 'chance' },
+            { name: '神奈川', price: 18000, rentLevels: [1400, 7000, 20000, 55000, 75000, 95000], color: '#ffa500', houseCost: 10000 },
+            { name: '東京', price: 20000, rentLevels: [1600, 8000, 22000, 60000, 80000, 100000], color: '#ffa500', houseCost: 10000 },
+            { name: '駐車場', type: 'parking' },
+            { name: '新潟', price: 22000, rentLevels: [1800, 9000, 25000, 70000, 87500, 105000], color: '#ff0000', houseCost: 15000 },
+            { name: 'チャンス', type: 'chance' },
+            { name: '仙台', price: 22000, rentLevels: [1800, 9000, 25000, 70000, 87500, 105000], color: '#ff0000', houseCost: 15000 },
+            { name: '札幌', price: 24000, rentLevels: [2000, 10000, 30000, 75000, 92500, 110000], color: '#ff0000', houseCost: 15000 },
+            { name: '鉄道:東', price: 20000, rent: 2500, type: 'railroad' },
+            { name: '広島', price: 26000, rentLevels: [2200, 11000, 33000, 80000, 97500, 115000], color: '#ffff00', houseCost: 15000 },
+            { name: '福島', price: 26000, rentLevels: [2200, 11000, 33000, 80000, 97500, 115000], color: '#ffff00', houseCost: 15000 },
+            { name: '水道局', price: 15000, type: 'utility' },
+            { name: '長野', price: 28000, rentLevels: [2400, 12000, 36000, 85000, 102500, 120000], color: '#ffff00', houseCost: 15000 },
+            { name: 'GO TO JAIL', type: 'gotojail' },
+            { name: '金沢', price: 30000, rentLevels: [2600, 13000, 39000, 90000, 110000, 127500], color: '#00ff00', houseCost: 20000 },
+            { name: '松本', price: 30000, rentLevels: [2600, 13000, 39000, 90000, 110000, 127500], color: '#00ff00', houseCost: 20000 },
+            { name: 'チャンス', type: 'chance' },  
+            { name: '長崎', price: 32000, rentLevels: [2800, 15000, 45000, 100000, 120000, 140000], color: '#00ff00', houseCost: 20000 },
+            { name: '鉄道:北', price: 20000, rent: 2500, type: 'railroad' },
+            { name: '通信会社', price: 15000, type: 'utility' },
+            { name: '渋谷', price: 35000, rentLevels: [3500, 17500, 50000, 110000, 130000, 150000], color: '#0000ff', houseCost: 20000 },
+            { name: '固定資産税', type: 'tax', amount: 10000 },
+            { name: '新宿', price: 40000, rentLevels: [5000, 20000, 60000, 140000, 170000, 200000], color: '#0000ff', houseCost: 20000 }
+        ];
+
+        const chanceCards = [
+            { text: "銀行から配当金 ¥5000 を受け取る。", action: (p) => { p.money += 5000; addLog(`${p.name} は配当金 ¥5,000 を受け取った。`); updatePlayerInfo(p); endTurn(); } },
+            { text: "GOマスに進む。", action: (p) => { movePlayerTo(p, 0, true); } },
+            { text: "修繕費として ¥3000 支払う。", action: (p) => { p.money -= 3000; addLog(`${p.name} は修繕費 ¥3,000 を支払った。`); updatePlayerInfo(p); endTurn(); } },
+            { text: "一番近い鉄道まで進む。", action: (p) => advanceToNearest(p, 'railroad') },
+            { text: "刑務所から釈放されるカード。", action: (p) => { p.getOutOfJailFree = true; addLog(`${p.name} は「刑務所から釈放」カードを手に入れた！`); endTurn();} },
+            { text: "3マス戻る。", action: (p) => { movePlayerTo(p, (p.position - 3 + 40) % 40, false); } },
+        ];
+
+        let players = [];
+        let currentPlayerIndex = 0;
+        let isGameOver = false;
+        const DOM = {};
+
+        function cacheDomElements() {
+            const elements = document.querySelectorAll('[id]');
+            elements.forEach(el => {
+                const key = el.id.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
+                DOM[key] = el;
+            });
+        }
+
+        function initGame() {
+            cacheDomElements();
+            boardData.forEach((space, index) => {
+                space.id = index;
+                if (space.price) {
+                    space.owner = -1;
+                    space.houses = 0;
+                }
+            });
+            drawBoard();
+            players = [
+                { id: 0, name: 'あなた', type: 'human', money: 150000, position: 0, properties: [], inJail: false, jailTurns: 0, getOutOfJailFree: false, tokenElement: null, color: '#ef4444' },
+                { id: 1, name: 'CPU 1', type: 'cpu', money: 150000, position: 0, properties: [], inJail: false, jailTurns: 0, getOutOfJailFree: false, tokenElement: null, color: '#3b82f6' },
+                { id: 2, name: 'CPU 2', type: 'cpu', money: 150000, position: 0, properties: [], inJail: false, jailTurns: 0, getOutOfJailFree: false, tokenElement: null, color: '#22c55e' }
+            ];
+            players.forEach(p => {
+                createPlayerToken(p);
+                drawPlayerInfo(p);
+            });
+            addEventListeners();
+            addLog("ようこそ！AI交渉モノポリーへ！");
+            startTurn();
+        }
+
+        function addEventListeners() {
+            DOM.rollDiceBtn.addEventListener('click', () => {
+                const p = players[currentPlayerIndex];
+                if (p.type === 'human' && !DOM.rollDiceBtn.disabled) {
+                    rollDiceAndMove(p);
+                }
+            });
+            DOM.manageAssetsBtn.addEventListener('click', openManageAssetsModal);
+            DOM.modalCloseBtn.addEventListener('click', () => DOM.propertyModal.classList.add('hidden'));
+            DOM.manageAssetsCloseBtn.addEventListener('click', () => DOM.manageAssetsModal.classList.add('hidden'));
+        }
+
+        function drawBoard() {
+            const boardEl = DOM.board;
+            boardEl.innerHTML = '<div id="board-center">日本周遊</div>'; // Clear board except center
+            boardData.forEach((space, index) => {
+                const spaceEl = document.createElement('div');
+                spaceEl.id = `space-${index}`;
+                spaceEl.className = 'space';
+                let content = `<div class="space-name">${space.name}</div>`;
+                if (space.color) {
+                    content = `<div class="color-bar" style="background-color: ${space.color};"></div>${content}`;
+                }
+                if (space.price) {
+                    content += `<div class="price">¥${space.price.toLocaleString()}</div>`;
+                }
+                spaceEl.innerHTML = content;
+                spaceEl.addEventListener('click', () => showPropertyModal(index));
+                boardEl.appendChild(spaceEl);
+            });
+        }
+
+        function createPlayerToken(player) {
+            player.tokenElement = document.createElement('div');
+            player.tokenElement.className = 'player-token';
+            player.tokenElement.style.backgroundColor = player.color;
+            player.tokenElement.style.transform = `translate(${-50 + player.id * 10}%, -50%)`;
+            document.getElementById('space-0').appendChild(player.tokenElement);
+        }
+
+        function drawPlayerInfo(player) {
+            let container = document.getElementById(`player-info-${player.id}`);
+            if (!container) {
+                container = document.createElement('div');
+                container.id = `player-info-${player.id}`;
+                container.className = 'p-2 rounded-lg mb-2 transition-all duration-300 ease-in-out';
+                DOM.playersInfoContainer.appendChild(container);
+            }
+
+            // Group owned properties by color/type
+            const ownedPropertiesGrouped = {};
+            player.properties.forEach(pIdx => {
+                const prop = boardData[pIdx];
+                const groupKey = prop.color || prop.type;
+                if (!ownedPropertiesGrouped[groupKey]) {
+                    ownedPropertiesGrouped[groupKey] = [];
+                }
+                ownedPropertiesGrouped[groupKey].push(prop);
+            });
+
+            let propertiesHtml = '<div class="flex flex-wrap gap-1 mt-2">';
+            if (player.properties.length === 0) {
+                propertiesHtml += '<p class="text-gray-500 italic text-xs">なし</p>';
+            } else {
+                const sortedGroups = Object.entries(ownedPropertiesGrouped).sort(([keyA], [keyB]) => {
+                    if (keyA.startsWith('#') && !keyB.startsWith('#')) return -1;
+                    if (!keyA.startsWith('#') && keyB.startsWith('#')) return 1;
+                    return keyA.localeCompare(keyB);
+                });
+
+                for (const [groupKey, props] of sortedGroups) {
+                    const isColorGroup = groupKey.startsWith('#');
+                    const bgColor = isColorGroup ? groupKey : '#6b7280'; // gray for railroad/utility
+                    
+                    props.forEach(prop => {
+                        propertiesHtml += `<div class="text-xs text-white px-1.5 py-0.5 rounded" style="background-color: ${bgColor}; text-shadow: 0 0 3px #000;">${prop.name}</div>`;
+                    });
+                }
+            }
+            propertiesHtml += '</div>';
+
+            container.style.border = `2px solid ${player.color}`;
+            container.innerHTML = `
+                <div class="font-bold" style="color: ${player.color}">${player.name} ${player.inJail ? '(刑務所)' : ''}</div>
+                <div>所持金: ¥${player.money.toLocaleString()}</div>
+                <div class="font-bold mt-2 text-sm border-b">所有物件</div>
+                ${propertiesHtml}
+            `;
+        }
+        
+        function updatePlayerInfo(player) {
+            drawPlayerInfo(player);
+        }
+
+        function addLog(message) {
+            const logEl = document.createElement('div');
+            logEl.className = 'mb-1 text-sm';
+            // Colorize player names
+            players.forEach(p => {
+                const regex = new RegExp(p.name, 'g');
+                message = message.replace(regex, `<span style="font-weight: bold; color: ${p.color};">${p.name}</span>`);
+            });
+            logEl.innerHTML = message;
+            DOM.logMessages.prepend(logEl);
+        }
+
+        function startTurn() {
+            if (isGameOver) return;
+
+            // Highlight current player
+            players.forEach(p => {
+                const playerInfoEl = document.getElementById(`player-info-${p.id}`);
+                if (playerInfoEl) playerInfoEl.classList.remove('shadow-xl', 'scale-105', 'bg-yellow-100');
+            });
+            const currentPlayerInfoEl = document.getElementById(`player-info-${players[currentPlayerIndex].id}`);
+            if (currentPlayerInfoEl) currentPlayerInfoEl.classList.add('shadow-xl', 'scale-105', 'bg-yellow-100');
+
+            const currentPlayer = players[currentPlayerIndex];
+            DOM.turnIndicator.textContent = `${currentPlayer.name} の番です`;
+            players.forEach(p => updatePlayerInfo(p)); // Update all infos for freshness
+
+            if (currentPlayer.type === 'human') {
+                DOM.rollDiceBtn.disabled = currentPlayer.inJail;
+                DOM.manageAssetsBtn.disabled = false;
+            } else {
+                DOM.rollDiceBtn.disabled = true;
+                DOM.manageAssetsBtn.disabled = true;
+                setTimeout(() => {
+                    if (currentPlayer.inJail) {
+                        handleJailTurn(currentPlayer, false); // CPU doesn't try to roll for doubles for now
+                    } else {
+                        rollDiceAndMove(currentPlayer);
+                    }
+                }, 1000);
+            }
+        }
+
+        function rollDiceAndMove(player) {
+            if (player.type === 'human') DOM.rollDiceBtn.disabled = true;
+            const dice1 = Math.floor(Math.random() * 6) + 1;
+            const dice2 = Math.floor(Math.random() * 6) + 1;
+            DOM.dice1.textContent = dice1;
+            DOM.dice2.textContent = dice2;
+            addLog(`${player.name} はサイコロを振って ${dice1}と${dice2}、計${dice1 + dice2}が出た。`);
+            
+            if (player.inJail) {
+                handleJailTurn(player, dice1 === dice2);
+            } else {
+                movePlayerBy(player, dice1 + dice2);
+            }
+        }
+
+        function movePlayerBy(player, steps) {
+            const newPosition = (player.position + steps) % 40;
+            movePlayerTo(player, newPosition, player.position + steps >= 40);
+        }
+
+        function movePlayerTo(player, newPosition, passedGo) {
+            player.position = newPosition;
+            if (passedGo && !player.inJail) {
+                player.money += 20000;
+                addLog(`${player.name} がGOマスを通過し、¥20,000 を受け取った。`);
+                updatePlayerInfo(player);
+            }
+            const spaceEl = document.getElementById(`space-${player.position}`);
+            spaceEl.appendChild(player.tokenElement);
+            const space = boardData[player.position];
+            addLog(`${player.name} が ${space.name} に着きました`);
+            handleLanding(player);
+        }
+
+        function handleLanding(player) {
+            const spaceIndex = player.position;
+            const space = boardData[spaceIndex];
+
+            switch (space.type) {
+                case 'go':
+                case 'jail':
+                case 'parking':
+                    endTurn();
+                    break;
+                case 'chance':
+                    drawChanceCard(player);
+                    break;
+                case 'tax':
+                    player.money -= space.amount;
+                    addLog(`${player.name} は税金 ¥${space.amount.toLocaleString()} を支払った。`);
+                    updatePlayerInfo(player);
+                    endTurn();
+                    break;
+                case 'gotojail':
+                    goToJail(player);
+                    endTurn();
+                    break;
+                default: // Property, Railroad, Utility
+                    if (space.owner === -1) { // Unowned
+                        if (player.money >= space.price) {
+                            if (player.type === 'human') {
+                                showActionPanel(`「${space.name}」を購入しますか？`, `価格: ¥${space.price.toLocaleString()}`,
+                                    () => { buyProperty(player, spaceIndex); endTurn(); },
+                                    () => { addLog(`${player.name} は購入を見送りました。`); endTurn(); }
+                                );
+                            } else { // CPU logic
+                                if (player.money > space.price * 1.5) {
+                                    buyProperty(player, spaceIndex);
+                                }
+                                endTurn();
+                            }
+                        } else {
+                             addLog(`お金が足りないため ${space.name} を購入できません。`);
+                             endTurn();
+                        }
+                    } else if (space.owner !== player.id) { // Owned by someone else
+                        payRent(player, spaceIndex);
+                        endTurn();
+                    } else { // Owned by self
+                        endTurn();
+                    }
+                    break;
+            }
+        }
+        
+        function showActionPanel(title, text, onConfirm, onCancel) {
+            DOM.actionTitle.textContent = title;
+            DOM.actionText.textContent = text;
+            const newBuyBtn = DOM.actionBuyBtn.cloneNode(true);
+            DOM.actionBuyBtn.parentNode.replaceChild(newBuyBtn, DOM.actionBuyBtn);
+            DOM.actionBuyBtn = newBuyBtn;
+            const newPassBtn = DOM.actionPassBtn.cloneNode(true);
+            DOM.actionPassBtn.parentNode.replaceChild(newPassBtn, DOM.actionPassBtn);
+            DOM.actionPassBtn = newPassBtn;
+            DOM.actionBuyBtn.onclick = () => { DOM.actionPanel.classList.add('hidden'); onConfirm(); };
+            DOM.actionPassBtn.onclick = () => { DOM.actionPanel.classList.add('hidden'); onCancel(); };
+            DOM.actionPanel.classList.remove('hidden');
+        }
+
+        function buyProperty(player, spaceIndex) {
+            const space = boardData[spaceIndex];
+            if (player.money >= space.price) {
+                player.money -= space.price;
+                space.owner = player.id;
+                player.properties.push(spaceIndex);
+                addLog(`${player.name} が ${space.name} を購入しました`);
+                updatePlayerInfo(player);
+                updateBoardUI(spaceIndex);
+            }
+        }
+
+        function payRent(player, spaceIndex) {
+            const space = boardData[spaceIndex];
+            const owner = players[space.owner];
+            if (!owner || owner.inJail) { /* No rent if owner is in jail */ return; }
+
+            let rent = 0;
+            if (space.type === 'utility') {
+                const diceRoll = parseInt(DOM.dice1.textContent) + parseInt(DOM.dice2.textContent);
+                const ownedCount = owner.properties.filter(pIdx => boardData[pIdx].type === 'utility').length;
+                if (ownedCount === 1) rent = diceRoll * 400;
+                else if (ownedCount === 2) rent = diceRoll * 1000;
+                else if (ownedCount === 3) rent = diceRoll * 2000; // New rent for 3 utilities
+                addLog(`ユーティリティのレンタル料として ${diceRoll} x ${rent / diceRoll} を計算。`);
+            } else if (space.type === 'railroad') {
+                const ownedCount = owner.properties.filter(pIdx => boardData[pIdx].type === 'railroad').length;
+                rent = 2500 * Math.pow(2, ownedCount - 1);
+            } else { // Standard property
+                const ownedGroup = getColorGroups()[space.color].every(pIdx => boardData[pIdx].owner === owner.id);
+                rent = space.rentLevels[space.houses];
+                if (space.houses === 0 && ownedGroup) {
+                    rent *= 2; // Double rent for owning all properties in a color group
+                }
+            }
+
+            if (rent > 0) {
+                player.money -= rent;
+                owner.money += rent;
+                addLog(`${player.name} が ${owner.name} に家賃 ¥${rent.toLocaleString()} を支払いました`);
+                updatePlayerInfo(player);
+                updatePlayerInfo(owner);
+            }
+        }
+
+        function endTurn() {
+            if (!DOM.actionPanel.classList.contains('hidden')) {
+                DOM.actionPanel.classList.add('hidden');
+            }
+            if (isGameOver) return;
+            const player = players[currentPlayerIndex];
+            if (player.money < 0) {
+                handleBankruptcy(player);
+            }
+            currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
+            while(players[currentPlayerIndex].money < 0) {
+                currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
+            }
+            setTimeout(startTurn, 500); // Slightly faster turn transition
+        }
+
+        function updateOwnedIndicator(spaceIndex) {
+            const space = boardData[spaceIndex];
+            const spaceEl = document.getElementById(`space-${spaceIndex}`);
+            const existing = spaceEl.querySelector('.owned-indicator');
+            if(existing) existing.remove();
+            if (space.owner !== -1) {
+                const owner = players[space.owner];
+                const indicator = document.createElement('div');
+                indicator.className = 'owned-indicator';
+                indicator.style.backgroundColor = owner.color;
+                spaceEl.appendChild(indicator);
+            }
+        }
+        
+        function goToJail(player) {
+            player.position = 10;
+            player.inJail = true;
+            player.jailTurns = 0;
+            const spaceEl = document.getElementById(`space-10`);
+            spaceEl.appendChild(player.tokenElement);
+            addLog(`${player.name} は刑務所に入った！`);
+            updatePlayerInfo(player);
+        }
+
+        function handleJailTurn(player, rolledDoubles) {
+            addLog(`${player.name} は刑務所の中です。`);
+            player.jailTurns++;
+            if (rolledDoubles) {
+                addLog(`ゾロ目が出たので釈放！`);
+                player.inJail = false;
+                player.jailTurns = 0;
+                endTurn();
+            } else if (player.getOutOfJailFree) {
+                player.getOutOfJailFree = false;
+                player.inJail = false;
+                player.jailTurns = 0;
+                addLog(`「刑務所から釈放」カードを使って出所した。`);
+                endTurn();
+            } else if (player.jailTurns >= 3) {
+                addLog(`3ターン経過したので、¥5,000 を支払い釈放。`);
+                player.money -= 5000;
+                player.inJail = false;
+                player.jailTurns = 0;
+                updatePlayerInfo(player);
+                endTurn();
+            } else {
+                addLog(`今回は出られなかった...`);
+                endTurn();
+            }
+        }
+
+        function drawChanceCard(player) {
+            const card = chanceCards[Math.floor(Math.random() * chanceCards.length)];
+            addLog(`チャンスカード: ${card.text}`);
+            card.action(player);
+        }
+
+        function advanceToNearest(player, type) {
+            let currentPos = player.position;
+            let nearestPos = -1;
+            for (let i = 1; i < 40; i++) {
+                const checkPos = (currentPos + i) % 40;
+                if (boardData[checkPos].type === type) {
+                    nearestPos = checkPos;
+                    break;
+                }
+            }
+            if (nearestPos !== -1) {
+                movePlayerTo(player, nearestPos, nearestPos < currentPos);
+            } else {
+                endTurn(); // Should not happen
+            }
+        }
+        
+        function handleBankruptcy(player) {
+            addLog(`${player.name} は破産しました！`);
+            player.properties.forEach(pIdx => {
+                boardData[pIdx].owner = -1;
+                boardData[pIdx].houses = 0;
+                updateBoardUI(pIdx);
+            });
+            player.properties = [];
+            const remainingPlayers = players.filter(p => p.money >= 0);
+            if (remainingPlayers.length <= 1) { // Changed to <= 1 to handle final player
+                isGameOver = true;
+                const winner = remainingPlayers.length > 0 ? remainingPlayers[0] : players.find(p => p.id !== player.id); // Find winner
+                addLog(`ゲーム終了！ ${winner.name} の勝利です！`);
+                DOM.turnIndicator.textContent = `${winner.name} の勝利！`;
+                DOM.rollDiceBtn.disabled = true;
+                DOM.manageAssetsBtn.disabled = true;
+            }
+        }
+
+        function showPropertyModal(spaceIndex) {
+            const space = boardData[spaceIndex];
+            DOM.modalPropertyName.textContent = space.name;
+            DOM.modalColorBar.style.backgroundColor = space.color || 'transparent';
+            let info = '';
+
+            if (space.price) {
+                info += `<p class="mb-2">価格: ¥${space.price.toLocaleString()}</p>`;
+                if (space.owner !== -1) {
+                    info += `<p class="mb-4">所有者: <span style="font-weight:bold; color:${players[space.owner].color};">${players[space.owner].name}</span></p>`;
+                }
+            }
+
+            if (space.rentLevels) {
+                info += '<h4 class="font-bold text-lg border-b mb-2">レンタル料</h4>';
+                info += `<p>更地: ¥${space.rentLevels[0].toLocaleString()}</p>`;
+                for (let i = 1; i < 5; i++) {
+                    info += `<p>家 ${i} 軒: ¥${space.rentLevels[i].toLocaleString()}</p>`;
+                }
+                info += `<p>ホテル: ¥${space.rentLevels[5].toLocaleString()}</p>`;
+                const owner = players[space.owner];
+                if (owner) {
+                    const ownedGroup = getColorGroups()[space.color].every(pIdx => boardData[pIdx].owner === owner.id);
+                    if (ownedGroup) {
+                        info += '<p class="text-sm mt-2 text-green-600">※カラーグループ独占のため、更地のレンタル料は2倍です。</p>';
+                    }
+                }
+            } else if (space.type === 'railroad') {
+                info += '<h4 class="font-bold text-lg border-b mb-2">レンタル料</h4>';
+                info += '<p>1つ所有: ¥2,500</p>';
+                info += '<p>2つ所有: ¥5,000</p>';
+                info += '<p>3つ所有: ¥10,000</p>';
+                info += '<p>4つ所有: ¥20,000</p>';
+            } else if (space.type === 'utility') {
+                info += '<h4 class="font-bold text-lg border-b mb-2">レンタル料</h4>';
+                info += '<p>1つ所有: サイコロの目 x 400円</p>';
+                info += '<p>2つ所有: サイコロの目 x 1000円</p>';
+                info += '<p>3つ所有: サイコロの目 x 2000円</p>'; // New display for 3 utilities
+            }
+
+            DOM.modalPropertyInfo.innerHTML = info;
+            DOM.propertyModal.classList.remove('hidden');
+        }
+
+        function openManageAssetsModal() {
+            const modal = DOM.manageAssetsModal;
+            const container = DOM.assetGroupsContainer;
+            container.innerHTML = '';
+            const player = players[currentPlayerIndex];
+            const colorGroups = getColorGroups();
+            let hasBuildableGroups = false;
+
+            Object.entries(colorGroups).forEach(([color, propertiesInGroup]) => {
+                const ownedProperties = propertiesInGroup.filter(pIdx => boardData[pIdx].owner === player.id);
+                if (ownedProperties.length === propertiesInGroup.length) { // Complete set
+                    hasBuildableGroups = true;
+                    const groupEl = document.createElement('div');
+                    groupEl.className = 'mb-4 p-3 bg-gray-50 rounded-lg border';
+                    groupEl.style.borderLeft = `4px solid ${color}`;
+                    let content = `<h4 class="font-bold mb-2">${boardData[ownedProperties[0]].name.replace(/（.*）/, '')} グループ</h4>`;
+                    ownedProperties.forEach(pIdx => {
+                        const prop = boardData[pIdx];
+                        content += `<div class="flex justify-between items-center p-2 bg-white rounded border"><span>${prop.name} (家: ${prop.houses})</span><button class="text-xs bg-green-200 text-green-800 px-2 py-1 rounded disabled:opacity-50" onclick="buildHouse(${pIdx})" ${player.money < prop.houseCost || prop.houses >= 5 ? 'disabled' : ''}>+家 (¥${prop.houseCost.toLocaleString()})</button></div>`;
+                    });
+                    groupEl.innerHTML = content;
+                    container.appendChild(groupEl);
+                }
+            });
+
+            if (!hasBuildableGroups) {
+                container.innerHTML = '<p class="text-center text-gray-500">家を建てられる物件グループがありません。</p>';
+            }
+            modal.classList.remove('hidden');
+        }
+        
+        window.buildHouse = function(propIndex) {
+            const prop = boardData[propIndex];
+            const player = players[currentPlayerIndex];
+            if (player.money >= prop.houseCost && prop.houses < 5) {
+                player.money -= prop.houseCost;
+                prop.houses++;
+                addLog(`${player.name} が ${prop.name} に家を建てた (現在 ${prop.houses} 軒)`);
+                updatePlayerInfo(player);
+                updateBoardUI(propIndex);
+                openManageAssetsModal(); // Refresh modal
+            }
+        }
+
+        function updateBoardUI(spaceIndex) {
+            const space = boardData[spaceIndex];
+            const spaceEl = document.getElementById(`space-${spaceIndex}`);
+
+            // Update owned indicator
+            const existingIndicator = spaceEl.querySelector('.owned-indicator');
+            if(existingIndicator) existingIndicator.remove();
+            if (space.owner !== -1) {
+                const owner = players[space.owner];
+                const indicator = document.createElement('div');
+                indicator.className = 'owned-indicator';
+                indicator.style.backgroundColor = owner.color;
+                spaceEl.appendChild(indicator);
+            }
+
+            // Update house indicator
+            const existingHouses = spaceEl.querySelector('.house-indicator');
+            if(existingHouses) existingHouses.remove();
+            if (space.houses > 0) {
+                const houseContainer = document.createElement('div');
+                houseContainer.className = 'house-indicator';
+                if (space.houses === 5) {
+                    const hotel = document.createElement('div');
+                    hotel.className = 'hotel-icon';
+                    hotel.textContent = 'H';
+                    houseContainer.appendChild(hotel);
+                } else {
+                    for (let i = 0; i < space.houses; i++) {
+                        const house = document.createElement('div');
+                        house.className = 'house-icon';
+                        houseContainer.appendChild(house);
+                    }
+                }
+                spaceEl.appendChild(houseContainer);
+            }
+        }
+
+        function getColorGroups() {
+            const groups = {};
+            boardData.forEach((p, i) => {
+                if (p.color) {
+                    if (!groups[p.color]) groups[p.color] = [];
+                    groups[p.color].push(i);
+                }
+            });
+            return groups;
+        }
+
+        window.onload = initGame;
+    </script>
+</body>
+</html>
