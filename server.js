@@ -124,21 +124,23 @@ app.post('/negotiate', async (req, res) => {
   const { player, partner, yourOffer, theirOffer, message, boardData } = req.body;
 
   try {
-    const prompt = `あなたはモノポリーゲームのCPUプレイヤーです。以下の交渉提案について、相手プレイヤー（人間）に返答してください。\n\n現在の状況:
+    const getPropertyName = (id) => boardData.find(p => p.id === id)?.name || '不明な物件';
+
+    const prompt = `あなたはモノポリーゲームのCPUプレイヤーです。以下の交渉提案について、相手プレイヤー（人間）に返答してください.\n\n現在の状況:
 - あなたのプレイヤー名: ${partner.name}
 - あなたの所持金: ¥${(partner.money || 0).toLocaleString()}
-- あなたの所有物件: ${partner.properties.filter(pIdx => pIdx !== null && pIdx !== undefined).map(pIdx => boardData[pIdx]?.name).join(', ') || 'なし'}
+- あなたの所有物件: ${partner.properties.map(getPropertyName).join(', ') || 'なし'}
 
 相手プレイヤー（${player.name}）の提案:
-- 提示物件: ${yourOffer.properties.filter(pIdx => pIdx !== null && pIdx !== undefined).map(pIdx => boardData[pIdx]?.name).join(', ') || 'なし'}
+- 提示物件: ${yourOffer.properties.map(getPropertyName).join(', ') || 'なし'}
 - 提示現金: ¥${(yourOffer.money || 0).toLocaleString()}
 
 あなたが要求されているもの:
-- 要求物件: ${theirOffer.properties.filter(pIdx => pIdx !== null && pIdx !== undefined).map(pIdx => boardData[pIdx]?.name).join(', ') || 'なし'}
-- 要求現金: ¥${(theirOffer.money || 0).toLocaleString()}\n\n相手からのメッセージ: "${message}"\n\nあなたの返答は、以下のJSON形式でお願いします。\n{\n  "decision": "accept" | "reject" | "counter",\n  "response_text": "[返答メッセージ]",\n  "counter_offer": {\n    "properties": [物件ID],\n    "money": [金額]\n  },\n  "counter_request": {\n    "properties": [物件ID],\n    "money": [金額]\n  }\n}\n\n- 'decision'は'accept'（受け入れる）、'reject'（拒否する）、'counter'（再提案する）のいずれかです。\n- 'response_text'は相手へのメッセージです。\n- 'counter'の場合のみ'counter_offer'と'counter_request'を含めてください。\n- 'counter_offer'はあなたが相手に提示する物件と現金、'counter_request'はあなたが相手に要求する物件と現金です。\n- 物件IDはboardDataのインデックスです。\n\nあなたの返答:`;
+- 要求物件: ${theirOffer.properties.map(getPropertyName).join(', ') || 'なし'}
+- 要求現金: ¥${(theirOffer.money || 0).toLocaleString()}\n\n相手からのメッセージ: "${message}"\n\nあなたの返答は、以下のJSON形式でお願いします.\n{\n  "decision": "accept" | "reject" | "counter",\n  "response_text": "[返答メッセージ]",\n  "counter_offer": {\n    "properties": ["物件ID"],\n    "money": 0\n  },\n  "counter_request": {\n    "properties": ["物件ID"],\n    "money": 0\n  }\n}\n\n- 'decision'は'accept'（受け入れる）、'reject'（拒否する）、'counter'（再提案する）のいずれかです.\n- 'response_text'は相手へのメッセージです.\n- 'counter'の場合のみ'counter_offer'と'counter_request'を含めてください.\n- 物件IDは'okinawa'のような文字列IDです.\n\nあなたの返答:`;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo", // You can choose a different model like "gpt-4" if available
+      model: "gpt-4o",
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
       temperature: 0.7,
@@ -150,6 +152,62 @@ app.post('/negotiate', async (req, res) => {
   } catch (error) {
     console.error('Error during OpenAI negotiation:', error);
     res.status(500).json({ decision: 'reject', response_text: '交渉中にエラーが発生しました。', error: error.message });
+  }
+});
+
+// Endpoint for AI to decide on construction
+app.post('/decide-construction', async (req, res) => {
+  console.log('Received /decide-construction request body:', JSON.stringify(req.body, null, 2));
+  const { cpuPlayer, buildableProperties } = req.body;
+
+  try {
+    const propertiesString = buildableProperties.map(prop => {
+        const currentRent = prop.rentLevels[prop.houses];
+        const nextRent = prop.rentLevels[prop.houses + 1];
+        return `- ${prop.name} (ID: ${prop.id}, 現在${prop.houses}軒, 建築コスト:¥${prop.houseCost}, 家賃: ¥${currentRent} -> ¥${nextRent})`;
+    }).join('\n');
+
+    const prompt = `あなたはモノポリーの戦略的なAIプレイヤーです。目的は、他のプレイヤーを破産させて勝利することです。そのための最も重要な戦略の一つは、独占したカラーグループに家を建てて、高額な家賃収入を得ることです。
+
+現在のあなたの状況:
+- プレイヤー名: ${cpuPlayer.name}
+- 所持金: ¥${cpuPlayer.money.toLocaleString()}
+
+建築可能な物件のリスト:
+${propertiesString}
+
+上記の情報を元に、どの物件に家を1軒建てるべきか、あるいは今は建築を見送るべきかを判断してください。
+
+判断のヒント:
+- 所持金を全て使い切るのは危険です。他のプレイヤーの高額な土地に止まった際に支払う現金は残しておくべきです。一般的に、建築後も最低 ¥20,000 ~ ¥30,000 は手元に残しておくと安全です。
+- 複数の選択肢がある場合、どの物件に建築すれば最も家賃の上がり幅が大きく、投資対効果が高いかを考慮してください。
+- 相手を破産させる可能性が最も高まるような、戦略的な一手を選んでください。
+
+あなたの判断を、以下のJSON形式で出力してください。
+{
+  "decision": "build" | "pass",
+  "propertyId": "[建築を決定した物件のID]" | null,
+  "reason": "[判断理由を簡潔に説明]"
+}
+
+- 建築する場合は "decision" を "build" とし、"propertyId" にその物件のID（例: "shinjuku"）を指定します。
+- 建築しない場合は "decision" を "pass" とし、"propertyId" は null にします。
+- 1ターンに建築できる家は1軒だけです。最も良い選択肢を一つだけ選んでください。`;
+
+    const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+        temperature: 0.5,
+    });
+
+    const llmResponse = JSON.parse(completion.choices[0].message.content);
+    console.log('LLM construction decision:', llmResponse);
+    res.json(llmResponse);
+
+  } catch (error) {
+    console.error('Error during AI construction decision:', error);
+    res.status(500).json({ decision: 'pass', propertyId: null, reason: 'AIの判断中にエラーが発生しました。' });
   }
 });
 
