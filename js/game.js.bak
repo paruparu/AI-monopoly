@@ -1,0 +1,708 @@
+// Game state
+let players = [];
+let currentPlayerIndex = 0;
+let isGameOver = false;
+let diceRolled = false;
+let consecutiveDoubles = 0;
+
+// DOM Elements
+let domElements = {};
+
+// Game data
+const boardData = [
+    { id: 'go', name: 'GO', type: 'go' },
+    { id: 'okinawa', name: '沖縄', price: 6000, rentLevels: [200, 1000, 3000, 9000, 16000, 25000], color: '#a52a2a', houseCost: 5000 },
+    { id: 'chance1', name: 'チャンス', type: 'chance' },
+    { id: 'hokkaido', name: '北海道', price: 6000, rentLevels: [400, 2000, 6000, 18000, 32000, 45000], color: '#a52a2a', houseCost: 5000 },
+    { id: 'tax1', name: '所得税', type: 'tax', amount: 2000 },
+    { id: 'shinkansen1', name: '新幹線', type: 'railroad', price: 20000 },
+    { id: 'kyoto', name: '京都', price: 10000, rentLevels: [600, 3000, 9000, 27000, 40000, 55000], color: '#87ceeb', houseCost: 5000 },
+    { id: 'chance2', name: 'チャンス', type: 'chance' },
+    { id: 'osaka', name: '大阪', price: 10000, rentLevels: [600, 3000, 9000, 27000, 40000, 55000], color: '#87ceeb', houseCost: 5000 },
+    { id: 'nagoya', name: '名古屋', price: 12000, rentLevels: [800, 4000, 10000, 30000, 45000, 60000], color: '#87ceeb', houseCost: 5000 },
+    { id: 'jail', name: '刑務所', type: 'jail' },
+    { id: 'fukuoka', name: '福岡', price: 14000, rentLevels: [1000, 5000, 15000, 45000, 62500, 75000], color: '#ff69b4', houseCost: 10000 },
+    { id: 'electric', name: '電気会社', type: 'utility', price: 15000 },
+    { id: 'sapporo', name: '札幌', price: 14000, rentLevels: [1000, 5000, 15000, 45000, 62500, 75000], color: '#ff69b4', houseCost: 10000 },
+    { id: 'tokyo', name: '東京', price: 16000, rentLevels: [1200, 6000, 18000, 50000, 70000, 90000], color: '#ff69b4', houseCost: 10000 },
+    { id: 'shinkansen2', name: '新幹線', type: 'railroad', price: 20000 },
+    { id: 'yokohama', name: '横浜', price: 18000, rentLevels: [1400, 7000, 20000, 55000, 75000, 95000], color: '#ff8c00', houseCost: 10000 },
+    { id: 'chance3', name: 'チャンス', type: 'chance' },
+    { id: 'nagasaki', name: '長崎', price: 18000, rentLevels: [1400, 7000, 20000, 55000, 75000, 95000], color: '#ff8c00', houseCost: 10000 },
+    { id: 'hiroshima', name: '広島', price: 20000, rentLevels: [1600, 8000, 22000, 60000, 80000, 100000], color: '#ff8c00', houseCost: 10000 },
+    { id: 'parking', name: '無料駐車場', type: 'parking' },
+    { id: 'nara', name: '奈良', price: 22000, rentLevels: [1800, 9000, 25000, 70000, 87500, 105000], color: '#ff0000', houseCost: 15000 },
+    { id: 'chance4', name: 'チャンス', type: 'chance' },
+    { id: 'kanazawa', name: '金沢', price: 22000, rentLevels: [1800, 9000, 25000, 70000, 87500, 105000], color: '#ff0000', houseCost: 15000 },
+    { id: 'kobe', name: '神戸', price: 24000, rentLevels: [2000, 10000, 30000, 75000, 92500, 110000], color: '#ff0000', houseCost: 15000 },
+    { id: 'shinkansen3', name: '新幹線', type: 'railroad', price: 20000 },
+    { id: 'sendai', name: '仙台', price: 26000, rentLevels: [2200, 11000, 33000, 80000, 97500, 115000], color: '#ffff00', houseCost: 15000 },
+    { id: 'nagano', name: '長野', price: 26000, rentLevels: [2200, 11000, 33000, 80000, 97500, 115000], color: '#ffff00', houseCost: 15000 },
+    { id: 'water', name: '水道局', type: 'utility', price: 15000 },
+    { id: 'kyushu', name: '九州', price: 28000, rentLevels: [2400, 12000, 36000, 85000, 102500, 120000], color: '#ffff00', houseCost: 15000 },
+    { id: 'go_to_jail', name: '刑務所行き', type: 'go_to_jail' },
+    { id: 'himeji', name: '姫路', price: 30000, rentLevels: [2600, 13000, 39000, 90000, 110000, 127500], color: '#32cd32', houseCost: 20000 },
+    { id: 'naha', name: '那覇', price: 30000, rentLevels: [2600, 13000, 39000, 90000, 110000, 127500], color: '#32cd32', houseCost: 20000 },
+    { id: 'chance5', name: 'チャンス', type: 'chance' },
+    { id: 'kagoshima', name: '鹿児島', price: 32000, rentLevels: [2800, 15000, 45000, 100000, 120000, 140000], color: '#32cd32', houseCost: 20000 },
+    { id: 'shinkansen4', name: '新幹線', type: 'railroad', price: 20000 },
+    { id: 'chance6', name: 'チャンス', type: 'chance' },
+    { id: 'sapporo2', name: '札幌', price: 35000, rentLevels: [3500, 17500, 50000, 110000, 130000, 150000], color: '#0000cd', houseCost: 20000 },
+    { id: 'luxury_tax', name: '高級税', type: 'tax', amount: 7500 },
+    { id: 'tokyo_station', name: '東京駅', price: 40000, rentLevels: [5000, 20000, 60000, 140000, 170000, 200000], color: '#0000cd', houseCost: 20000 }
+];
+
+// Initialize the game
+function initGame() {
+    // Initialize players
+    players = [
+        { id: 'player1', name: 'あなた', money: 150000, position: 0, properties: [], color: '#ff0000', isHuman: true, getOutOfJailCards: 0, inJail: false, jailTurns: 0 },
+        { id: 'cpu1', name: 'CPU 1', money: 150000, position: 0, properties: [], color: '#0000ff', isHuman: false, getOutOfJailCards: 0, inJail: false, jailTurns: 0 },
+        { id: 'cpu2', name: 'CPU 2', money: 150000, position: 0, properties: [], color: '#008000', isHuman: false, getOutOfJailCards: 0, inJail: false, jailTurns: 0 },
+        { id: 'cpu3', name: 'CPU 3', money: 150000, position: 0, properties: [], color: '#ffa500', isHuman: false, getOutOfJailCards: 0, inJail: false, jailTurns: 0 }
+    ];
+
+    // Cache DOM elements
+    cacheDomElements();
+    
+    // Draw the initial board
+    drawBoard();
+    
+    // Add event listeners
+    addEventListeners();
+    
+    // Start the game
+    startTurn();
+}
+
+// Cache DOM elements for better performance
+function cacheDomElements() {
+    domElements = {
+        rollDiceBtn: document.getElementById('roll-dice-btn'),
+        manageAssetsBtn: document.getElementById('manage-assets-btn'),
+        endTurnBtn: document.getElementById('end-turn-btn'),
+        dice1: document.getElementById('dice1'),
+        dice2: document.getElementById('dice2'),
+        playersInfoContainer: document.getElementById('players-info-container'),
+        actionPanel: document.getElementById('action-panel'),
+        actionTitle: document.getElementById('action-title'),
+        actionText: document.getElementById('action-text'),
+        actionButtons: document.getElementById('action-buttons'),
+        actionBuyBtn: document.getElementById('action-buy-btn'),
+        actionPassBtn: document.getElementById('action-pass-btn'),
+        logContainer: document.getElementById('log-container')
+    };
+}
+
+// Add event listeners
+function addEventListeners() {
+    // Roll dice button
+    domElements.rollDiceBtn.addEventListener('click', () => {
+        const currentPlayer = players[currentPlayerIndex];
+        if (currentPlayer.isHuman && !diceRolled) {
+            rollDiceAndMove(currentPlayer);
+        }
+    });
+    
+    // End turn button
+    domElements.endTurnBtn.addEventListener('click', () => {
+        const currentPlayer = players[currentPlayerIndex];
+        if (currentPlayer.isHuman) {
+            endTurn();
+        }
+    });
+    
+    // Manage assets button
+    domElements.manageAssetsBtn.addEventListener('click', () => {
+        const currentPlayer = players[currentPlayerIndex];
+        if (currentPlayer.isHuman) {
+            openManageAssetsModal();
+        }
+    });
+    
+    // Action panel buttons
+    domElements.actionBuyBtn.addEventListener('click', () => {
+        const currentPlayer = players[currentPlayerIndex];
+        const currentSpace = boardData[currentPlayer.position];
+        if (currentPlayer.isHuman && currentSpace && currentSpace.price) {
+            buyProperty(currentPlayer, currentSpace.id);
+        }
+    });
+    
+    domElements.actionPassBtn.addEventListener('click', () => {
+        domElements.actionPanel.classList.add('hidden');
+    });
+}
+
+// Draw the game board
+function drawBoard() {
+    const board = document.getElementById('board');
+    
+    // Clear the board first (except the center)
+    const spaces = document.querySelectorAll('.space');
+    spaces.forEach(space => space.remove());
+    
+    // Create spaces
+    boardData.forEach((space, index) => {
+        if (index === 0) return; // Skip GO as it's already in the HTML
+        
+        const spaceEl = document.createElement('div');
+        spaceEl.id = `space-${index}`;
+        spaceEl.className = 'space';
+        
+        if (space.color) {
+            const colorBar = document.createElement('div');
+            colorBar.className = 'color-bar';
+            colorBar.style.backgroundColor = space.color;
+            spaceEl.appendChild(colorBar);
+        }
+        
+        const nameEl = document.createElement('div');
+        nameEl.className = 'space-name';
+        nameEl.textContent = space.name;
+        spaceEl.appendChild(nameEl);
+        
+        if (space.price) {
+            const priceEl = document.createElement('div');
+            priceEl.className = 'price';
+            priceEl.textContent = `¥${space.price.toLocaleString()}`;
+            spaceEl.appendChild(priceEl);
+        }
+        
+        board.appendChild(spaceEl);
+    });
+    
+    // Draw player tokens
+    players.forEach(player => {
+        createPlayerToken(player);
+    });
+}
+
+// Create player token
+function createPlayerToken(player) {
+    const token = document.createElement('div');
+    token.className = 'player-token';
+    token.id = `token-${player.id}`;
+    token.style.backgroundColor = player.color;
+    token.style.left = '50%';
+    token.style.top = '50%';
+    token.style.transform = 'translate(-50%, -50%)';
+    
+    const board = document.getElementById('board');
+    board.appendChild(token);
+    
+    // Position the token
+    movePlayerTo(player, player.position, false);
+}
+
+// Move player to a new position
+function movePlayerTo(player, newPosition, passedGo = true) {
+    const oldPosition = player.position;
+    player.position = newPosition;
+    
+    // Check if player passed GO
+    if (passedGo && newPosition < oldPosition) {
+        player.money += 20000;
+        addLog(`${player.name}がGOを通過して¥20,000を獲得しました`);
+        updatePlayerInfo(player);
+    }
+    
+    // Update token position
+    const token = document.getElementById(`token-${player.id}`);
+    if (token) {
+        // Simple animation - in a real game, you'd want to animate the movement
+        // For now, just update the position
+        const space = document.getElementById(`space-${newPosition}`);
+        if (space) {
+            const rect = space.getBoundingClientRect();
+            token.style.left = `${rect.left + rect.width / 2}px`;
+            token.style.top = `${rect.top + rect.height / 2}px`;
+        }
+    }
+    
+    // Handle landing on the new space
+    handleLanding(player);
+}
+
+// Handle player landing on a space
+function handleLanding(player) {
+    const space = boardData[player.position];
+    if (!space) return;
+    
+    switch (space.type) {
+        case 'go':
+            addLog(`${player.name}がGOに止まりました`);
+            break;
+            
+        case 'tax':
+            const taxAmount = space.amount || 2000;
+            player.money -= taxAmount;
+            addLog(`${player.name}が${space.name}（¥${taxAmount.toLocaleString()}）を支払いました`);
+            updatePlayerInfo(player);
+            break;
+            
+        case 'jail':
+            addLog(`${player.name}は刑務所を見学中です`);
+            break;
+            
+        case 'go_to_jail':
+            goToJail(player);
+            break;
+            
+        case 'parking':
+            addLog(`${player.name}は無料駐車場に止まりました`);
+            break;
+            
+        case 'chance':
+            drawChanceCard(player);
+            break;
+            
+        case 'property':
+        case 'railroad':
+        case 'utility':
+            // Check if property is owned
+            const owner = players.find(p => p.properties.includes(space.id));
+            if (owner) {
+                if (owner.id === player.id) {
+                    addLog(`${player.name}は自分の${space.name}に止まりました`);
+                } else {
+                    const rent = calculateRent(space, 0, owner); // Pass 0 as dice roll for now
+                    player.money -= rent;
+                    owner.money += rent;
+                    addLog(`${player.name}は${owner.name}に${space.name}の家賃¥${rent.toLocaleString()}を支払いました`);
+                    updatePlayerInfo(player);
+                    updatePlayerInfo(owner);
+                    
+                    // Check for bankruptcy
+                    if (player.money < 0) {
+                        handleBankruptcy(player);
+                    }
+                }
+            } else if (space.price && space.price <= player.money) {
+                // Show buy dialog for human players
+                if (player.isHuman) {
+                    showActionPanel(
+                        '物件を購入しますか？',
+                        `${space.name}を¥${space.price.toLocaleString()}で購入しますか？`,
+                        () => buyProperty(player, space.id),
+                        () => {}
+                    );
+                } else {
+                    // AI decision to buy
+                    if (Math.random() > 0.5) { // 50% chance to buy
+                        buyProperty(player, space.id);
+                    } else {
+                        addLog(`${player.name}は${space.name}の購入をパスしました`);
+                    }
+                }
+            } else {
+                addLog(`${player.name}は${space.name}に止まりました`);
+            }
+            break;
+    }
+}
+
+// Show action panel with custom message and buttons
+function showActionPanel(title, text, onConfirm, onCancel) {
+    domElements.actionTitle.textContent = title;
+    domElements.actionText.textContent = text;
+    domElements.actionPanel.classList.remove('hidden');
+    
+    // Remove previous event listeners
+    const newConfirmBtn = domElements.actionBuyBtn.cloneNode(true);
+    const newPassBtn = domElements.actionPassBtn.cloneNode(true);
+    
+    domElements.actionBuyBtn.replaceWith(newConfirmBtn);
+    domElements.actionPassBtn.replaceWith(newPassBtn);
+    
+    domElements.actionBuyBtn = newConfirmBtn;
+    domElements.actionPassBtn = newPassBtn;
+    
+    // Add new event listeners
+    domElements.actionBuyBtn.onclick = () => {
+        domElements.actionPanel.classList.add('hidden');
+        onConfirm();
+    };
+    
+    domElements.actionPassBtn.onclick = () => {
+        domElements.actionPanel.classList.add('hidden');
+        onCancel();
+    };
+}
+
+// Buy property
+function buyProperty(player, spaceId) {
+    const space = boardData.find(s => s.id === spaceId);
+    if (!space || !space.price) return;
+    
+    player.money -= space.price;
+    player.properties.push(spaceId);
+    
+    // Update UI
+    updatePlayerInfo(player);
+    updateBoardUI(spaceId);
+    
+    addLog(`${player.name}が${space.name}を¥${space.price.toLocaleString()}で購入しました`);
+    
+    // Close action panel if open
+    domElements.actionPanel.classList.add('hidden');
+}
+
+// Update player info in the UI
+function updatePlayerInfo(player) {
+    const playerEl = document.getElementById(`player-${player.id}`);
+    if (playerEl) {
+        const moneyEl = playerEl.querySelector('.player-money');
+        if (moneyEl) {
+            moneyEl.textContent = `¥${player.money.toLocaleString()}`;
+        }
+    }
+}
+
+// Update board UI when property changes hands
+function updateBoardUI(spaceId) {
+    const space = boardData.find(s => s.id === spaceId);
+    if (!space) return;
+    
+    const spaceEl = document.getElementById(`space-${boardData.indexOf(space)}`);
+    if (!spaceEl) return;
+    
+    // Clear previous ownership indicators
+    const oldIndicators = spaceEl.querySelectorAll('.owned-indicator, .house-indicator');
+    oldIndicators.forEach(el => el.remove());
+    
+    // Find the owner
+    const owner = players.find(p => p.properties.includes(spaceId));
+    if (owner) {
+        // Add ownership indicator
+        const indicator = document.createElement('div');
+        indicator.className = 'owned-indicator';
+        indicator.style.backgroundColor = owner.color;
+        spaceEl.appendChild(indicator);
+        
+        // Add houses if any
+        if (space.houses > 0) {
+            const houseContainer = document.createElement('div');
+            houseContainer.className = 'house-indicator';
+            
+            if (space.houses === 5) {
+                // Hotel
+                const hotel = document.createElement('div');
+                hotel.className = 'hotel-icon';
+                hotel.textContent = 'H';
+                houseContainer.appendChild(hotel);
+            } else {
+                // Houses
+                for (let i = 0; i < space.houses; i++) {
+                    const house = document.createElement('div');
+                    house.className = 'house-icon';
+                    houseContainer.appendChild(house);
+                }
+            }
+            
+            spaceEl.appendChild(houseContainer);
+        }
+    }
+}
+
+// Roll dice and move player
+function rollDiceAndMove(player) {
+    if (diceRolled) return;
+    
+    const { d1, d2, sum } = rollDice();
+    const isDouble = d1 === d2;
+    
+    // Update dice UI
+    domElements.dice1.textContent = d1;
+    domElements.dice2.textContent = d2;
+    
+    // Add roll animation class
+    domElements.dice1.classList.add('animate-ping');
+    domElements.dice2.classList.add('animate-ping');
+    
+    // Remove animation class after it completes
+    setTimeout(() => {
+        domElements.dice1.classList.remove('animate-ping');
+        domElements.dice2.classList.remove('animate-ping');
+    }, 500);
+    
+    addLog(`${player.name}のターン: ${d1}と${d2}の目 (合計: ${sum})`);
+    
+    if (player.inJail) {
+        handleJailTurn(player, isDouble);
+    } else {
+        if (isDouble) {
+            consecutiveDoubles++;
+            if (consecutiveDoubles === 3) {
+                // Three doubles in a row - go to jail
+                goToJail(player);
+                return;
+            }
+        } else {
+            consecutiveDoubles = 0;
+        }
+        
+        // Move player
+        const newPosition = (player.position + sum) % 40;
+        movePlayerTo(player, newPosition, true);
+    }
+    
+    diceRolled = true;
+    
+    // If it's a CPU player's turn, continue with their turn
+    if (!player.isHuman) {
+        setTimeout(() => continueCpuTurn(player), 1000);
+    }
+}
+
+// Continue CPU turn after rolling
+function continueCpuTurn(currentPlayer) {
+    // Simple AI logic - in a real game, this would be more sophisticated
+    const currentSpace = boardData[currentPlayer.position];
+    
+    // If the CPU can buy the property and has enough money, buy it
+    if (currentSpace.price && !currentSpace.owner && currentPlayer.money >= currentSpace.price) {
+        if (Math.random() > 0.3) { // 70% chance to buy
+            buyProperty(currentPlayer, currentSpace.id);
+        } else {
+            addLog(`${currentPlayer.name}は${currentSpace.name}の購入をパスしました`);
+        }
+    }
+    
+    // End turn after a short delay
+    setTimeout(() => endTurn(), 1000);
+}
+
+// End current player's turn
+function endTurn() {
+    // Reset dice rolled flag
+    diceRolled = false;
+    
+    // Move to next player
+    currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
+    const nextPlayer = players[currentPlayerIndex];
+    
+    // Update UI
+    document.getElementById('turn-indicator').textContent = `${nextPlayer.name}の番です`;
+    
+    // Start next player's turn
+    startTurn();
+}
+
+// Start player's turn
+function startTurn() {
+    const currentPlayer = players[currentPlayerIndex];
+    
+    // Update UI
+    domElements.dice1.textContent = '?';
+    domElements.dice2.textContent = '?';
+    
+    // If it's a CPU player's turn, roll the dice automatically after a short delay
+    if (!currentPlayer.isHuman) {
+        setTimeout(() => rollDiceAndMove(currentPlayer), 1000);
+    }
+}
+
+// Handle player going to jail
+function goToJail(player) {
+    player.position = 10; // Jail position
+    player.inJail = true;
+    player.jailTurns = 0;
+    
+    // Update token position
+    movePlayerTo(player, 10, false);
+    
+    addLog(`${player.name}は刑務所に入りました`);
+    
+    // End turn
+    if (!player.isHuman) {
+        setTimeout(() => endTurn(), 1000);
+    }
+}
+
+// Handle player's turn in jail
+function handleJailTurn(player, rolledDoubles) {
+    if (rolledDoubles) {
+        // Player rolled doubles - get out of jail
+        player.inJail = false;
+        player.jailTurns = 0;
+        addLog(`${player.name}は刑務所から出ました`);
+        
+        // Move player
+        const newPosition = (10 + player.dice1 + player.dice2) % 40;
+        movePlayerTo(player, newPosition, true);
+    } else {
+        // Player didn't roll doubles
+        player.jailTurns++;
+        
+        if (player.jailTurns >= 3) {
+            // After 3 turns, must pay to get out
+            if (player.money >= 5000) {
+                player.money -= 5000;
+                player.inJail = false;
+                player.jailTurns = 0;
+                addLog(`${player.name}は¥5,000を支払って刑務所から出ました`);
+                updatePlayerInfo(player);
+                
+                // Move player
+                const newPosition = (10 + player.dice1 + player.dice2) % 40;
+                movePlayerTo(player, newPosition, true);
+            } else {
+                // Can't pay - bankrupt
+                handleBankruptcy(player);
+            }
+        } else {
+            addLog(`${player.name}は刑務所にいます (${player.jailTurns}/3)`);
+            
+            // End turn
+            if (!player.isHuman) {
+                setTimeout(() => endTurn(), 1000);
+            }
+        }
+    }
+}
+
+// Handle player bankruptcy
+function handleBankruptcy(player) {
+    // In a real game, handle selling properties, etc.
+    addLog(`${player.name}は破産しました！`);
+    
+    // Remove player from the game
+    const playerIndex = players.findIndex(p => p.id === player.id);
+    if (playerIndex !== -1) {
+        players.splice(playerIndex, 1);
+        
+        // Remove player token
+        const token = document.getElementById(`token-${player.id}`);
+        if (token) token.remove();
+        
+        // Remove player info
+        const playerInfo = document.getElementById(`player-${player.id}`);
+        if (playerInfo) playerInfo.remove();
+    }
+    
+    // Check if game is over
+    if (players.length === 1) {
+        // Game over
+        isGameOver = true;
+        const winner = players[0];
+        addLog(`ゲーム終了！ ${winner.name}の勝利です！`);
+        
+        // Disable buttons
+        domElements.rollDiceBtn.disabled = true;
+        domElements.manageAssetsBtn.disabled = true;
+        domElements.endTurnBtn.disabled = true;
+    } else if (playerIndex < currentPlayerIndex) {
+        // Adjust current player index if needed
+        currentPlayerIndex--;
+    }
+    
+    // End turn
+    if (!isGameOver) {
+        endTurn();
+    }
+}
+
+// Draw chance card
+function drawChanceCard(player) {
+    const chanceCards = [
+        'GOへ進む',
+        '刑務所へ直行',
+        '最寄りの鉄道会社に進む',
+        '最寄りの公共事業会社に進む',
+        '3マス戻る',
+        '¥5,000を支払う',
+        '¥10,000を受け取る',
+        '各プレイヤーに¥2,000を支払う'
+    ];
+    
+    const card = chanceCards[Math.floor(Math.random() * chanceCards.length)];
+    addLog(`${player.name}は「${card}」のチャンスカードを引きました`);
+    
+    // Handle card effect
+    if (card === 'GOへ進む') {
+        movePlayerTo(player, 0, true);
+    } else if (card === '刑務所へ直行') {
+        goToJail(player);
+    } else if (card === '最寄りの鉄道会社に進む') {
+        advanceToNearest(player, 'railroad');
+    } else if (card === '最寄りの公共事業会社に進む') {
+        advanceToNearest(player, 'utility');
+    } else if (card === '3マス戻る') {
+        const newPosition = (player.position - 3 + 40) % 40;
+        movePlayerTo(player, newPosition, false);
+    } else if (card === '¥5,000を支払う') {
+        player.money -= 5000;
+        updatePlayerInfo(player);
+    } else if (card === '¥10,000を受け取る') {
+        player.money += 10000;
+        updatePlayerInfo(player);
+    } else if (card === '各プレイヤーに¥2,000を支払う') {
+        players.forEach(p => {
+            if (p.id !== player.id) {
+                player.money -= 2000;
+                p.money += 2000;
+                updatePlayerInfo(p);
+            }
+        });
+        updatePlayerInfo(player);
+    }
+}
+
+// Advance player to nearest space of a certain type
+function advanceToNearest(player, type) {
+    let position = player.position;
+    let spacesMoved = 0;
+    
+    // Keep moving forward until we find a matching space
+    while (true) {
+        position = (position + 1) % 40;
+        spacesMoved++;
+        
+        const space = boardData[position];
+        if ((type === 'railroad' && space.type === 'railroad') ||
+            (type === 'utility' && space.type === 'utility')) {
+            // Found a matching space
+            movePlayerTo(player, position, spacesMoved > 1);
+            break;
+        }
+        
+        // Prevent infinite loops
+        if (spacesMoved >= 40) break;
+    }
+}
+
+// Open manage assets modal
+function openManageAssetsModal() {
+    const currentPlayer = players[currentPlayerIndex];
+    
+    // In a real game, this would show a modal with the player's properties
+    // and options to build houses, mortgage properties, etc.
+    addLog(`${currentPlayer.name}の資産管理画面を表示`);
+    
+    // For now, just show a simple message
+    alert('資産管理機能は現在開発中です');
+}
+
+// Add log message
+function addLog(message) {
+    const logEl = document.createElement('div');
+    logEl.className = 'p-2 border-b border-gray-200';
+    logEl.textContent = message;
+    
+    const logContainer = document.getElementById('log-container');
+    if (logContainer) {
+        logContainer.insertBefore(logEl, logContainer.firstChild);
+        
+        // Limit log entries
+        while (logContainer.children.length > 50) {
+            logContainer.removeChild(logContainer.lastChild);
+        }
+    }
+    
+    // Also log to console
+    console.log(message);
+}
+
+// Initialize the game when the page loads
+window.addEventListener('DOMContentLoaded', initGame);

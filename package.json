@@ -1,17 +1,24 @@
 {
   "name": "ai-monopoly",
   "version": "1.0.0",
+  "type": "module",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "AI Monopoly Game with Negotiation Features",
   "dependencies": {
     "dotenv": "^16.6.0",
     "express": "^5.1.0",
-    "openai": "^5.7.0"
+    "openai": "^5.7.0",
+    "xstate": "^5.20.0"
+  },
+  "devDependencies": {
+    "@xstate/test": "^0.5.1",
+    "jest": "^30.0.3"
   }
 }
